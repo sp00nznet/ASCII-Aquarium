@@ -1,5 +1,32 @@
 # ASCII Aquarium
 
+<table>
+  <tr>
+    <td width="58%" valign="top">
+      <h1>ASCII Aquarium</h1>
+      <p>
+        A tiny animated ASCII fish tank for the ESP32-2432S028R
+        Cheap Yellow Display.
+      </p>
+      <p>
+        Flash it from the browser, tap to feed the fish, tune the tank,
+        sync the clock over Wi-Fi, and let the punctuation swim.
+      </p>
+      <p>
+        <a href="https://power-pill.github.io/ASCII-Aquarium/">
+          Flash ASCII Aquarium CYD
+        </a>
+      </p>
+    </td>
+    <td width="42%" valign="top">
+      <img
+        src="https://github.com/user-attachments/assets/34200303-25c9-45c5-a6eb-1e53a6c267d7"
+        alt="ASCII Aquarium running on a CYD display"
+        width="100%">
+    </td>
+  </tr>
+</table>
+
 A tiny animated ASCII fish tank for the ESP32-2432S028R "Cheap Yellow Display".
 
 ASCII Aquarium turns the common 320x240 CYD touchscreen into a living little
@@ -11,7 +38,12 @@ It is not a video loop. The aquarium is rendered live on the ESP32, with fish
 that wander, school, turn around, change brightness, avoid each other, and chase
 food when you tap the glass.
 
-<img width="720" height="540" alt="ASCII_Aqurium_Title_GIF" src="https://github.com/user-attachments/assets/34200303-25c9-45c5-a6eb-1e53a6c267d7" style="float: right;"/>
+<td width="42%" valign="top">
+      <img
+        src="https://github.com/user-attachments/assets/34200303-25c9-45c5-a6eb-1e53a6c267d7"
+        alt="ASCII Aquarium Title Screen Render"
+        width="100%">
+    </td>
 
 ## Web Flasher
 
