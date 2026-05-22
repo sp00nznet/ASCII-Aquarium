@@ -1,4 +1,4 @@
-// ASCII_Aquarium_CYD.ino | Version: v1.66
+// ASCII_Aquarium_CYD.ino | Version: v1.67
 
 // Optional manual edit notes: America/Winnipeg (Central Time) — use 12-hour style (e.g. 3:45 PM), not 24-hour.
 #include <Arduino.h>
@@ -43,7 +43,7 @@
 */
 
 /** Shown run label in HUD title (must match line-1 banner when you release builds). */
-static constexpr const char* kSketchVersionLabel = "v1.66";
+static constexpr const char* kSketchVersionLabel = "v1.67";
 
 // ------------------------------ CYD Touch Pins -------------------------------
 static const int TOUCH_CS_PIN = 33;
@@ -127,7 +127,7 @@ static const int CLOCK_STYLE_BUTTON_W = 66;
 static const int CLOCK_STYLE_PANEL_X = 46;
 static const int CLOCK_STYLE_PANEL_Y = 54;
 static const int CLOCK_STYLE_PANEL_W = 228;
-static const int CLOCK_STYLE_PANEL_H = 132;
+static const int CLOCK_STYLE_PANEL_H = 176;
 static const int CLOCK_STYLE_CLOSE_X = CLOCK_STYLE_PANEL_X + CLOCK_STYLE_PANEL_W - 32;
 static const int CLOCK_STYLE_CLOSE_Y = CLOCK_STYLE_PANEL_Y + 8;
 static const int CLOCK_STYLE_CLOSE_W = 24;
@@ -135,6 +135,7 @@ static const int CLOCK_STYLE_CLOSE_H = 22;
 static const int CLOCK_STYLE_ROW_1_Y = CLOCK_STYLE_PANEL_Y + 40;
 static const int CLOCK_STYLE_ROW_2_Y = CLOCK_STYLE_PANEL_Y + 74;
 static const int CLOCK_STYLE_ROW_3_Y = CLOCK_STYLE_PANEL_Y + 104;
+static const int CLOCK_STYLE_ROW_4_Y = CLOCK_STYLE_PANEL_Y + 134;
 static const int CLOCK_STYLE_LABEL_X = CLOCK_STYLE_PANEL_X + 14;
 static const int CLOCK_STYLE_LEFT_X = CLOCK_STYLE_PANEL_X + 104;
 static const int CLOCK_STYLE_RIGHT_X = CLOCK_STYLE_PANEL_X + 164;
@@ -163,6 +164,9 @@ static const int ASCII_CLOCK_GLYPH_GAP = 1;
 static const int ASCII_CLOCK_CHAR_W = 6;
 static const int ASCII_CLOCK_ROW_H = 10;
 static const int ASCII_CLOCK_Y = 68;
+static const int CLOCK_FLIP_SPRITE_W = 192;
+static const int CLOCK_FLIP_SPRITE_H = 20;
+static const uint16_t CLOCK_FLIP_TRANSPARENT = 0x0801;  // Dark magenta key colour, outside the clock palette.
 
 static const int CORNER_BUTTON_W = 28;
 static const int CORNER_BUTTON_H = 20;
@@ -612,6 +616,7 @@ static const int kAltFishColorCount = sizeof(kAltFishColors) / sizeof(kAltFishCo
 // ------------------------------ Globals --------------------------------------
 TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite canvas = TFT_eSprite(&tft);
+TFT_eSprite clockFlipSprite = TFT_eSprite(&tft);
 SPIClass touchSPI(HSPI);
 SPIClass sdSPI(VSPI);
 XPT2046_Touchscreen touch(TOUCH_CS_PIN, TOUCH_IRQ_PIN);
@@ -642,8 +647,10 @@ ClockDisplayStyle clockDisplayStyle = CLOCK_STYLE_SMALL_TEXT;
 ClockSmallPosition clockSmallPosition = CLOCK_SMALL_TOP;
 bool clockStylePanelOpen = false;
 bool clockColorPanelOpen = false;
+bool clockFlipHorizontal = false;
 uint16_t clockSmallTextColor = DEFAULT_SMALL_CLOCK_COLOR;
 uint16_t clockAsciiTextColor = DEFAULT_ASCII_CLOCK_COLOR;
+bool clockFlipSpriteReady = false;
 int timezoneIndex = DEFAULT_TIMEZONE_INDEX;
 int clockYear = DEFAULT_CLOCK_YEAR;
 int clockMonth = DEFAULT_CLOCK_MONTH;
@@ -1376,6 +1383,35 @@ void trimTrailingSpaces(char* out) {
   }
 }
 
+char mirroredClockChar(char c) {
+  switch (c) {
+    case '/': return '\\';
+    case '\\': return '/';
+    case '(': return ')';
+    case ')': return '(';
+    case '[': return ']';
+    case ']': return '[';
+    case '{': return '}';
+    case '}': return '{';
+    case '<': return '>';
+    case '>': return '<';
+    default: return c;
+  }
+}
+
+void mirrorClockTextInPlace(char* text) {
+  int len = strlen(text);
+  for (int i = 0; i < len / 2; ++i) {
+    char left = mirroredClockChar(text[i]);
+    char right = mirroredClockChar(text[len - 1 - i]);
+    text[i] = right;
+    text[len - 1 - i] = left;
+  }
+  if (len % 2 == 1) {
+    text[len / 2] = mirroredClockChar(text[len / 2]);
+  }
+}
+
 uint16_t activeClockTextColor() {
   return (clockDisplayStyle == CLOCK_STYLE_ASCII) ? clockAsciiTextColor : clockSmallTextColor;
 }
@@ -1565,7 +1601,7 @@ static bool pixelFlowerGeometryDirty = true;
 
 void savePersistentState() {
   prefs.begin("ascii-aq", false);
-  prefs.putUChar("ver", 2);
+  prefs.putUChar("ver", 3);
   prefs.putInt("fish", fishTargetCount);
   prefs.putInt("bubbles", bubbleTargetCount);
   prefs.putInt("oct_freq", octopusFrequency);
@@ -1579,6 +1615,7 @@ void savePersistentState() {
   prefs.putBool("clock_net", clockUseInternetTime);
   prefs.putUChar("clk_style", (uint8_t)clockDisplayStyle);
   prefs.putUChar("clk_pos", (uint8_t)clockSmallPosition);
+  prefs.putBool("clk_flip", clockFlipHorizontal);
   prefs.putUShort("clk_s_col", clockSmallTextColor);
   prefs.putUShort("clk_a_col", clockAsciiTextColor);
   prefs.putInt("tz_idx", timezoneIndex);
@@ -1620,6 +1657,7 @@ void loadPersistentState() {
     clockUseInternetTime = prefs.getBool("clock_net", false);
     clockDisplayStyle = (ClockDisplayStyle)prefs.getUChar("clk_style", (uint8_t)CLOCK_STYLE_SMALL_TEXT);
     clockSmallPosition = (ClockSmallPosition)prefs.getUChar("clk_pos", (uint8_t)CLOCK_SMALL_TOP);
+    clockFlipHorizontal = prefs.getBool("clk_flip", false);
     clockSmallTextColor = prefs.getUShort("clk_s_col", DEFAULT_SMALL_CLOCK_COLOR);
     clockAsciiTextColor = prefs.getUShort("clk_a_col", DEFAULT_ASCII_CLOCK_COLOR);
     timezoneIndex = prefs.getInt("tz_idx", DEFAULT_TIMEZONE_INDEX);
@@ -2817,11 +2855,49 @@ void drawAsciiClockBackground(TFT_eSprite& s) {
       }
       appendAsciiClockGlyphRow(rowBuf, sizeof(rowBuf), asciiClockGlyphFor(timeText[i]), row);
     }
+    if (clockFlipHorizontal) {
+      mirrorClockTextInPlace(rowBuf);
+    }
     trimTrailingSpaces(rowBuf);
     if (rowBuf[0] != '\0') s.drawString(rowBuf, x, y + row * ASCII_CLOCK_ROW_H);
   }
 
   s.setTextFont(2);
+}
+
+void drawMirroredSmallClock(TFT_eSprite& s, const char* line, int y) {
+  if (!clockFlipSpriteReady) {
+    char fallback[32];
+    copySafe(fallback, sizeof(fallback), line);
+    mirrorClockTextInPlace(fallback);
+    s.setTextDatum(TC_DATUM);
+    s.drawString(fallback, SCREEN_W / 2, y);
+    return;
+  }
+
+  clockFlipSprite.setTextFont(2);
+  clockFlipSprite.setTextSize(1);
+  clockFlipSprite.setTextDatum(TL_DATUM);
+  clockFlipSprite.fillSprite(CLOCK_FLIP_TRANSPARENT);
+  uint16_t transparentKey = clockFlipSprite.readPixel(0, CLOCK_FLIP_SPRITE_H - 1);
+  clockFlipSprite.setTextColor(clockSmallTextColor, CLOCK_FLIP_TRANSPARENT);
+  clockFlipSprite.drawString(line, 0, 0);
+
+  int textW = clockFlipSprite.textWidth(line);
+  if (textW <= 0) return;
+  int drawW = clampVal(textW, 1, CLOCK_FLIP_SPRITE_W);
+  int destX = (SCREEN_W - drawW) / 2;
+
+  for (int py = 0; py < CLOCK_FLIP_SPRITE_H; ++py) {
+    int destY = y + py;
+    if (destY < 0 || destY >= SCREEN_H) continue;
+    for (int px = 0; px < drawW; ++px) {
+      uint16_t color = clockFlipSprite.readPixel(px, py);
+      if (color != transparentKey) {
+        s.drawPixel(destX + drawW - 1 - px, destY, color);
+      }
+    }
+  }
 }
 
 void drawClock(TFT_eSprite& s) {
@@ -2832,7 +2908,11 @@ void drawClock(TFT_eSprite& s) {
   s.setTextDatum(TC_DATUM);
   s.setTextColor(clockSmallTextColor);
   int y = (clockSmallPosition == CLOCK_SMALL_TOP) ? 4 : (SCREEN_H - 18);
-  s.drawString(line, SCREEN_W / 2, y);
+  if (clockFlipHorizontal) {
+    drawMirroredSmallClock(s, line, y);
+  } else {
+    s.drawString(line, SCREEN_W / 2, y);
+  }
 }
 
 void drawHud(TFT_eSprite& s) {
@@ -3215,16 +3295,16 @@ void drawClockStyleChoiceRow(TFT_eSprite& s, int rowY, const char* label, const 
 }
 
 void drawClockStyleColorRow(TFT_eSprite& s) {
-  const int centerY = CLOCK_STYLE_ROW_3_Y + SETTINGS_BUTTON_H / 2;
+  const int centerY = CLOCK_STYLE_ROW_4_Y + SETTINGS_BUTTON_H / 2;
   s.setTextDatum(ML_DATUM);
   s.setTextColor(TFT_WHITE, TFT_NAVY);
   s.drawString("Colour", CLOCK_STYLE_LABEL_X, centerY);
 
   uint16_t color = activeClockTextColor();
-  s.fillRoundRect(CLOCK_STYLE_SWATCH_X, CLOCK_STYLE_ROW_3_Y + 3, CLOCK_STYLE_SWATCH_W, SETTINGS_BUTTON_H - 6, 3, color);
-  s.drawRoundRect(CLOCK_STYLE_SWATCH_X, CLOCK_STYLE_ROW_3_Y + 3, CLOCK_STYLE_SWATCH_W, SETTINGS_BUTTON_H - 6, 3,
+  s.fillRoundRect(CLOCK_STYLE_SWATCH_X, CLOCK_STYLE_ROW_4_Y + 3, CLOCK_STYLE_SWATCH_W, SETTINGS_BUTTON_H - 6, 3, color);
+  s.drawRoundRect(CLOCK_STYLE_SWATCH_X, CLOCK_STYLE_ROW_4_Y + 3, CLOCK_STYLE_SWATCH_W, SETTINGS_BUTTON_H - 6, 3,
                   color == TFT_WHITE ? TFT_DARKGREY : TFT_WHITE);
-  drawButton(s, CLOCK_STYLE_COLOR_BUTTON_X, CLOCK_STYLE_ROW_3_Y, CLOCK_STYLE_COLOR_BUTTON_W, SETTINGS_BUTTON_H,
+  drawButton(s, CLOCK_STYLE_COLOR_BUTTON_X, CLOCK_STYLE_ROW_4_Y, CLOCK_STYLE_COLOR_BUTTON_W, SETTINGS_BUTTON_H,
              "Pick", clockColorPanelOpen ? TFT_NAVY : TFT_CYAN, clockColorPanelOpen ? TFT_CYAN : TFT_DARKGREEN);
 }
 
@@ -3283,6 +3363,8 @@ void drawClockStylePanel(TFT_eSprite& s) {
     s.drawString("Standard", CLOCK_STYLE_PANEL_X + CLOCK_STYLE_PANEL_W - 44, centerY);
   }
 
+  drawClockStyleChoiceRow(s, CLOCK_STYLE_ROW_3_Y, "Flip Clock", "Off", "On",
+                          !clockFlipHorizontal, clockFlipHorizontal);
   drawClockStyleColorRow(s);
   drawButton(s, CLOCK_STYLE_CLOSE_X, CLOCK_STYLE_CLOSE_Y, CLOCK_STYLE_CLOSE_W, CLOCK_STYLE_CLOSE_H, "X", TFT_WHITE, TFT_RED);
 }
@@ -3558,9 +3640,20 @@ void handleClockStylePanelTouch(int x, int y) {
     return;
   }
 
-  if (inside(x, y, CLOCK_STYLE_SWATCH_X, CLOCK_STYLE_ROW_3_Y, CLOCK_STYLE_SWATCH_W, SETTINGS_BUTTON_H) ||
-      inside(x, y, CLOCK_STYLE_COLOR_BUTTON_X, CLOCK_STYLE_ROW_3_Y, CLOCK_STYLE_COLOR_BUTTON_W, SETTINGS_BUTTON_H)) {
+  if (inside(x, y, CLOCK_STYLE_SWATCH_X, CLOCK_STYLE_ROW_4_Y, CLOCK_STYLE_SWATCH_W, SETTINGS_BUTTON_H) ||
+      inside(x, y, CLOCK_STYLE_COLOR_BUTTON_X, CLOCK_STYLE_ROW_4_Y, CLOCK_STYLE_COLOR_BUTTON_W, SETTINGS_BUTTON_H)) {
     clockColorPanelOpen = true;
+    return;
+  }
+
+  if (inside(x, y, CLOCK_STYLE_LEFT_X, CLOCK_STYLE_ROW_3_Y, CLOCK_STYLE_CHOICE_W, SETTINGS_BUTTON_H)) {
+    clockFlipHorizontal = false;
+    markSettingsDirty();
+    return;
+  }
+  if (inside(x, y, CLOCK_STYLE_RIGHT_X, CLOCK_STYLE_ROW_3_Y, CLOCK_STYLE_CHOICE_W, SETTINGS_BUTTON_H)) {
+    clockFlipHorizontal = true;
+    markSettingsDirty();
     return;
   }
 
@@ -3948,6 +4041,9 @@ void setup() {
   }
   if (spriteReady) {
     canvas.setTextFont(2);
+    clockFlipSprite.setColorDepth(16);
+    clockFlipSpriteReady = (clockFlipSprite.createSprite(CLOCK_FLIP_SPRITE_W, CLOCK_FLIP_SPRITE_H) != nullptr);
+    if (clockFlipSpriteReady) clockFlipSprite.setTextFont(2);
     tft.setCursor(10, 28);
     tft.setTextColor(TFT_CYAN, BG_COLOR);
     tft.println("Sprite buffer: OK");
