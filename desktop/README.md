@@ -12,15 +12,19 @@ Early port, in progress. Currently:
 - ✅ CMake + SDL2 build skeleton
 - ✅ Window + vsync'd main loop at 320×240, integer-scaled, with
   `--scale N`, `--fullscreen`, `--hide-cursor` flags and Escape / F11 keys
-- ⬜ Renderer primitives (pixel/line/rect/round-rect) and RGB565 palette
+- ✅ Renderer primitives (`drawPixel`/`drawLine`/`drawRect`/`fillRect`/
+  `drawRoundRect`/`fillRoundRect`/`fillScreen`/`pushImage`/`readPixel`) and
+  the full TFT_eSPI RGB565 color palette
 - ⬜ Bitmap fonts (Font 1 GLCD 6×8, Font 2 5×7) for splash + UI text
 - ⬜ Aquarium simulation port (fish, bubbles, flakes, seaweed, visitors)
 - ⬜ Backgrounds, HUD + settings panels, on-screen keyboard
 - ⬜ Settings persistence, clock, BMP capture, kiosk autostart docs
 
 Right now if you build and run, the window opens at 640×480 (2x scale)
-showing a slow horizontal band drifting down a dark-blue background — that
-placeholder gets replaced once the renderer + fonts land.
+showing a small centered round-rect panel with a drifting band, a sweeping
+gold diagonal, and a moving pixel trail — placeholder content that
+exercises every renderer primitive end to end. It gets replaced once the
+fonts and the aquarium simulation land.
 
 ## Build
 

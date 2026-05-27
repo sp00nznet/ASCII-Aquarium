@@ -1,10 +1,11 @@
 // ASCII Aquarium desktop port — main entry.
 //
-// Opens an SDL2 window backed by a 320x240 RGB565 framebuffer (matching the
+// Opens an SDL2 window backed by a 320x240 RGB565 Framebuffer (matching the
 // CYD's native format), runs a vsync'd main loop, and supports kiosk-style
-// CLI flags. Drawing primitives, fonts, and the aquarium simulation land in
-// follow-up tasks; for now the loop renders a slowly drifting placeholder
-// pattern so it's visually obvious the window is alive.
+// CLI flags. The aquarium simulation, fonts, and UI panels arrive in later
+// tasks; for now the loop renders a placeholder pattern exercising the
+// freshly-landed renderer primitives so it's visually obvious the loop and
+// the drawing pipeline both work.
 
 #include <SDL.h>
 
@@ -12,6 +13,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+
+#include "renderer/Color.h"
+#include "renderer/Framebuffer.h"
 
 namespace {
 
@@ -70,22 +74,36 @@ bool parse_args(int argc, char* argv[], Options& opts) {
     return true;
 }
 
-// Temporary placeholder fill. A faint horizontal band drifts down the screen
-// so you can tell the loop is actually running. Removed once the real
-// renderer and splash text land in later tasks.
-void render_placeholder(uint16_t* pixels, unsigned frame) {
-    const uint16_t base = 0x0010;        // dark navy in RGB565
-    const uint16_t band = 0x4208;        // muted teal-grey
-    const int band_h = 8;
+// Temporary "is it alive" demo. Exercises fillScreen / fillRoundRect /
+// drawRoundRect / drawLine / drawPixel — every primitive landed in task #3 —
+// so a successful build immediately shows whether the renderer wiring is
+// correct end to end. Replaced once the aquarium simulation lands.
+void render_placeholder(aq::Framebuffer& fb, unsigned frame) {
+    fb.fillScreen(TFT_NAVY);
+
+    // Soft drifting band so it's obvious the loop is running.
     const int band_y = static_cast<int>((frame / 2u) % static_cast<unsigned>(kBackingHeight));
-    for (int y = 0; y < kBackingHeight; ++y) {
-        int dy = y - band_y;
-        if (dy < 0) dy += kBackingHeight;
-        const uint16_t c = (dy < band_h) ? band : base;
-        uint16_t* row = pixels + y * kBackingWidth;
-        for (int x = 0; x < kBackingWidth; ++x) {
-            row[x] = c;
-        }
+    fb.fillRect(0, band_y, kBackingWidth, 6, aq::rgb565(40, 64, 96));
+
+    // Centered "panel" preview using the round-rect primitives.
+    const int pw = 200;
+    const int ph = 100;
+    const int px = (kBackingWidth - pw) / 2;
+    const int py = (kBackingHeight - ph) / 2;
+    fb.fillRoundRect(px,     py,     pw,     ph,     8, TFT_BLACK);
+    fb.drawRoundRect(px,     py,     pw,     ph,     8, TFT_CYAN);
+    fb.drawRoundRect(px + 2, py + 2, pw - 4, ph - 4, 7, TFT_DARKCYAN);
+
+    // Diagonal sweep — proves drawLine works for arbitrary slopes.
+    const int sweep_x = static_cast<int>(frame % static_cast<unsigned>(pw - 20));
+    fb.drawLine(px + 10 + sweep_x, py + 10,
+                px + 10,           py + ph - 10,
+                TFT_GOLD);
+
+    // Pixel dot trail.
+    for (int i = 0; i < 16; ++i) {
+        const int dx = (static_cast<int>(frame) + i * 4) % (pw - 20);
+        fb.drawPixel(px + 10 + dx, py + ph - 14, TFT_GREENYELLOW);
     }
 }
 
@@ -125,8 +143,6 @@ int main(int argc, char* argv[]) {
         window, -1,
         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer) {
-        // Fall back to software renderer rather than die — some kiosk targets
-        // have no accelerated driver.
         renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
     }
     if (!renderer) {
@@ -154,7 +170,7 @@ int main(int argc, char* argv[]) {
 
     if (opts.hide_cursor) SDL_ShowCursor(SDL_DISABLE);
 
-    static uint16_t pixels[kBackingWidth * kBackingHeight];
+    aq::Framebuffer fb(kBackingWidth, kBackingHeight);
 
     bool running = true;
     unsigned frame = 0;
@@ -180,10 +196,10 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        render_placeholder(pixels, frame);
+        render_placeholder(fb, frame);
 
-        SDL_UpdateTexture(texture, nullptr, pixels,
-            static_cast<int>(kBackingWidth * sizeof(uint16_t)));
+        SDL_UpdateTexture(texture, nullptr, fb.data(),
+            static_cast<int>(fb.width() * sizeof(std::uint16_t)));
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, nullptr, nullptr);

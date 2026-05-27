@@ -19,6 +19,7 @@ find_package(SDL2 REQUIRED)
 
 set(AQ_SOURCES
     src/main.cpp
+    src/renderer/Framebuffer.cpp
 )
 
 add_executable(ascii-aquarium ${AQ_SOURCES})
