@@ -1,3 +1,107 @@
+# ASCII Aquarium — Desktop Port (fork)
+
+> **This is a fork of [POWER-PILL/ASCII-Aquarium](https://github.com/POWER-PILL/ASCII-Aquarium).**
+> All of the original ESP32 / Cheap Yellow Display work, art, animation
+> behavior, and feature design is by **POWER-PILL** and contributors. Every
+> swimming punctuation mark, the tap-to-feed flakes, the visiting octopus and
+> seahorse, the settings UI, the ASCII clock — none of that would exist
+> without their effort, and full credit for it stays with them. Please go give
+> the upstream repo a ⭐ and check out their [Hackaday write-up](https://hackaday.com/2026/05/24/adorable-ascii-aquarium-lives-on-your-desk).
+>
+> The upstream README (kept intact below) describes the firmware as it ships
+> on the CYD board. This fork's README adds the section directly below.
+
+## Why this fork exists
+
+The original ASCII Aquarium is a firmware image for a specific piece of
+hardware — the ESP32-2432S028R "Cheap Yellow Display." It is wonderful on
+that board and you should buy one. But a lot of us have small x86 PCs
+attached to small screens (mini-PCs, old netbooks, repurposed POS terminals,
+tablets running Linux, single-board x86 boxes) where running an ESP32-only
+build is not an option.
+
+This fork ports the aquarium to run as a native desktop application on
+**Linux and Windows on x86**, so the same tank can live on those tiny
+screens too.
+
+## What this fork adds
+
+- A `desktop/` directory containing a C++/SDL2 rewrite of the aquarium that
+  reproduces the on-device behavior and visuals on a normal PC.
+- A small `compat/` layer where it makes sense, so behavior (fish wandering,
+  schooling, separation, bubble physics, flake chase, octopus / seahorse
+  visitor cadence, seaweed sway, gradients, ASCII clock layout) stays faithful
+  to the device.
+- Desktop-appropriate replacements for the hardware bits:
+  - **Display**: SDL2 framebuffer at the original 320×240, with `--scale N`
+    integer scaling and `--fullscreen` for kiosk use on tiny screens.
+  - **Touch (XPT2046)** → SDL mouse / touch events, with optional cursor hide.
+  - **Persistent settings (ESP32 Preferences / NVS)** → JSON file at
+    `$XDG_CONFIG_HOME/ascii-aquarium/settings.json` on Linux and
+    `%APPDATA%\ascii-aquarium\settings.json` on Windows.
+  - **SD-card BMP capture** → writes to a local `captures/` directory
+    (`--capture-dir` to override). `BOOT` button → a keyboard hotkey.
+  - **Wi-Fi + NTP time sync** → uses the host's system clock. The Wi-Fi panel
+    is kept for UI parity but marked as system-managed.
+- Build files (CMake) that target Linux first and Windows second from the
+  same source tree.
+- Notes for autostarting as a kiosk (systemd user unit on Linux, Startup
+  folder / Task Scheduler on Windows).
+
+## What this fork does differently from upstream
+
+- **Target**: x86 Linux and Windows desktops, not the ESP32 CYD board.
+- **Firmware artifacts** (`.bin` files under `docs/firmware/`, the web
+  flasher under `docs/`, the Arduino sketch under `ASCII_Aquarium_CYD/`,
+  and the `User_Setup*.h` TFT_eSPI configs) are **kept in this repo
+  unchanged** so this fork can continue to track upstream releases. The
+  desktop port lives in its own `desktop/` subtree and does not modify any
+  of those files.
+- The desktop binary is intended to be visually faithful to the device but
+  is not a bit-exact emulator — it uses the host's clock, host's storage,
+  and host's input system.
+
+## Status
+
+Early port, in progress. See `desktop/README.md` for current build status
+and how to run.
+
+## Upstream sync
+
+```bash
+git remote add upstream https://github.com/POWER-PILL/ASCII-Aquarium.git  # one time
+git fetch upstream
+git merge upstream/main
+```
+
+## Credits
+
+- **[POWER-PILL](https://github.com/POWER-PILL)** and ASCII Aquarium
+  contributors — original firmware, simulation, art, UI, and the whole
+  project concept. This fork is downstream of, and dependent on, their work.
+- **[TFT_eSPI](https://github.com/Bodmer/TFT_eSPI)** by Bodmer — the
+  graphics library the upstream firmware draws through. The desktop port
+  reimplements a subset of its API on top of SDL2; the bitmap fonts used by
+  the desktop renderer are derived from TFT_eSPI's built-in glyph tables.
+- **[XPT2046_Touchscreen](https://github.com/PaulStoffregen/XPT2046_Touchscreen)**
+  by Paul Stoffregen — touch driver used upstream; mapped to SDL events
+  here.
+- **[SDL2](https://www.libsdl.org/)** — windowing, input, and the pixel
+  surface the desktop port pushes its frames to.
+- The 3D-printable cases linked in the upstream README are by their
+  respective creators (PowerPill.Prints, annaglyph) and are not affected by
+  this fork.
+
+If anything in this fork misattributes work, please open an issue and it
+will be fixed.
+
+---
+
+# Upstream README (POWER-PILL/ASCII-Aquarium)
+
+> The text from here on is the upstream README, kept verbatim for credit and
+> hardware-build reference.
+
 ## Meet the ASCII Aquarium ><(((°> 
 <table>
   <tr>
