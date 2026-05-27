@@ -39,8 +39,7 @@ if(MSVC)
     target_compile_options(ascii-aquarium PRIVATE /W4 /permissive-)
 else()
     target_compile_options(ascii-aquarium PRIVATE
-        -Wall -Wextra -Wpedantic
-        -Wshadow -Wconversion -Wsign-conversion
+        -Wall -Wextra -Wpedantic -Wshadow
     )
 endif()
 

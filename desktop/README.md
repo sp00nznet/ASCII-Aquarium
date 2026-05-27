@@ -7,9 +7,20 @@ See the top-level [README](../README.md) for fork context and credits.
 
 ## Status
 
-Early scaffold. Only the build skeleton is wired up so far — running it just
-prints SDL version info and exits. Tracking progress in the task list at the
-top of this fork.
+Early port, in progress. Currently:
+
+- ✅ CMake + SDL2 build skeleton
+- ✅ Window + vsync'd main loop at 320×240, integer-scaled, with
+  `--scale N`, `--fullscreen`, `--hide-cursor` flags and Escape / F11 keys
+- ⬜ Renderer primitives (pixel/line/rect/round-rect) and RGB565 palette
+- ⬜ Bitmap fonts (Font 1 GLCD 6×8, Font 2 5×7) for splash + UI text
+- ⬜ Aquarium simulation port (fish, bubbles, flakes, seaweed, visitors)
+- ⬜ Backgrounds, HUD + settings panels, on-screen keyboard
+- ⬜ Settings persistence, clock, BMP capture, kiosk autostart docs
+
+Right now if you build and run, the window opens at 640×480 (2x scale)
+showing a slow horizontal band drifting down a dark-blue background — that
+placeholder gets replaced once the renderer + fonts land.
 
 ## Build
 
@@ -70,17 +81,19 @@ desktop/
 Many of these directories start out empty (just `.gitkeep`); they fill in as
 the port progresses. See the top-level task list for the order.
 
-## Kiosk usage (planned)
+## Kiosk usage
 
-Will land in a later task. Sketch of the planned CLI:
+Current CLI:
 
 ```
-ascii-aquarium [--fullscreen] [--scale N] [--width W --height H]
-               [--hide-cursor] [--capture-dir PATH] [--settings PATH]
+ascii-aquarium [--scale N] [--fullscreen] [--hide-cursor] [--help]
 ```
 
-Linux autostart will use a systemd `--user` unit; Windows will use the
-Startup folder or Task Scheduler. Docs land alongside the kiosk-polish task.
+Runtime keys: `Escape` quits, `F11` toggles fullscreen.
+
+Planned (later tasks): `--capture-dir PATH`, `--settings PATH`, plus a
+systemd `--user` unit example for Linux autostart and a Startup folder /
+Task Scheduler recipe for Windows.
 
 [upstream]: https://github.com/POWER-PILL/ASCII-Aquarium
 [vcpkg]: https://vcpkg.io/
