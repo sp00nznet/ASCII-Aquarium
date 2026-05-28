@@ -15,16 +15,19 @@ Early port, in progress. Currently:
 - ✅ Renderer primitives (`drawPixel`/`drawLine`/`drawRect`/`fillRect`/
   `drawRoundRect`/`fillRoundRect`/`fillScreen`/`pushImage`/`readPixel`) and
   the full TFT_eSPI RGB565 color palette
-- ⬜ Bitmap fonts (Font 1 GLCD 6×8, Font 2 5×7) for splash + UI text
+- ✅ Bitmap fonts vendored from TFT_eSPI (Font 1 GLCD 6×8 fixed-width,
+  Font 2 16px proportional) with a TFT_eSPI-style text API
+  (`setTextFont`/`setTextDatum`/`setTextColor`/`drawString`/`drawChar`/
+  `textWidth`/`setCursor`/`println`)
 - ⬜ Aquarium simulation port (fish, bubbles, flakes, seaweed, visitors)
 - ⬜ Backgrounds, HUD + settings panels, on-screen keyboard
 - ⬜ Settings persistence, clock, BMP capture, kiosk autostart docs
 
 Right now if you build and run, the window opens at 640×480 (2x scale)
-showing a small centered round-rect panel with a drifting band, a sweeping
-gold diagonal, and a moving pixel trail — placeholder content that
-exercises every renderer primitive end to end. It gets replaced once the
-fonts and the aquarium simulation land.
+showing a centered round-rect panel with a drifting band, the title
+"ASCII Aquarium" in Font 2, a Font-1 subtitle, and a live frame counter —
+placeholder content that exercises every renderer primitive and both
+bitmap fonts end to end. It gets replaced once the aquarium simulation lands.
 
 ## Build
 

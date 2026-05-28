@@ -74,11 +74,13 @@ bool parse_args(int argc, char* argv[], Options& opts) {
     return true;
 }
 
-// Temporary "is it alive" demo. Exercises fillScreen / fillRoundRect /
-// drawRoundRect / drawLine / drawPixel — every primitive landed in task #3 —
-// so a successful build immediately shows whether the renderer wiring is
-// correct end to end. Replaced once the aquarium simulation lands.
-void render_placeholder(aq::Framebuffer& fb, unsigned frame) {
+// Temporary "is it alive" splash. Exercises the renderer primitives landed in
+// task #3 (fillScreen / fillRoundRect / drawRoundRect / drawLine) AND the
+// bitmap text landed in task #4 (setTextFont / setTextDatum / setTextColor /
+// drawString / textWidth), so a successful build immediately shows whether the
+// renderer wiring AND both fonts render correctly end to end. Replaced once the
+// aquarium simulation lands.
+void render_splash(aq::Framebuffer& fb, unsigned frame) {
     fb.fillScreen(TFT_NAVY);
 
     // Soft drifting band so it's obvious the loop is running.
@@ -86,25 +88,37 @@ void render_placeholder(aq::Framebuffer& fb, unsigned frame) {
     fb.fillRect(0, band_y, kBackingWidth, 6, aq::rgb565(40, 64, 96));
 
     // Centered "panel" preview using the round-rect primitives.
-    const int pw = 200;
-    const int ph = 100;
+    const int pw = 220;
+    const int ph = 110;
     const int px = (kBackingWidth - pw) / 2;
     const int py = (kBackingHeight - ph) / 2;
     fb.fillRoundRect(px,     py,     pw,     ph,     8, TFT_BLACK);
     fb.drawRoundRect(px,     py,     pw,     ph,     8, TFT_CYAN);
     fb.drawRoundRect(px + 2, py + 2, pw - 4, ph - 4, 7, TFT_DARKCYAN);
 
-    // Diagonal sweep — proves drawLine works for arbitrary slopes.
-    const int sweep_x = static_cast<int>(frame % static_cast<unsigned>(pw - 20));
-    fb.drawLine(px + 10 + sweep_x, py + 10,
-                px + 10,           py + ph - 10,
-                TFT_GOLD);
+    const int cx = kBackingWidth / 2;
 
-    // Pixel dot trail.
-    for (int i = 0; i < 16; ++i) {
-        const int dx = (static_cast<int>(frame) + i * 4) % (pw - 20);
-        fb.drawPixel(px + 10 + dx, py + ph - 14, TFT_GREENYELLOW);
-    }
+    // Title in Font 2 (16px proportional), centered via the MC datum.
+    fb.setTextFont(2);
+    fb.setTextDatum(MC_DATUM);
+    fb.setTextColor(TFT_GOLD);
+    const char* title = "ASCII Aquarium";
+    fb.drawString(title, cx, py + 34);
+
+    // Cyan underline sized by textWidth — proves measurement matches rendering.
+    const int tw = fb.textWidth(title);
+    fb.drawLine(cx - tw / 2, py + 48, cx + tw / 2, py + 48, TFT_CYAN);
+
+    // Subtitle in Font 1 (GLCD 6x8), centered.
+    fb.setTextFont(1);
+    fb.setTextColor(TFT_GREENYELLOW);
+    fb.drawString("desktop port", cx, py + 66);
+
+    // Animated frame counter, also Font 1, to confirm the loop advances.
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "frame %u", frame);
+    fb.setTextColor(TFT_DARKCYAN);
+    fb.drawString(buf, cx, py + 88);
 }
 
 bool is_fullscreen(SDL_Window* window) {
@@ -196,7 +210,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        render_placeholder(fb, frame);
+        render_splash(fb, frame);
 
         SDL_UpdateTexture(texture, nullptr, fb.data(),
             static_cast<int>(fb.width() * sizeof(std::uint16_t)));

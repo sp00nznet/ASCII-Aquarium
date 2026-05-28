@@ -20,11 +20,12 @@ find_package(SDL2 REQUIRED)
 set(AQ_SOURCES
     src/main.cpp
     src/renderer/Framebuffer.cpp
+    src/renderer/Font.cpp
 )
 
 add_executable(ascii-aquarium ${AQ_SOURCES})
 
-target_include_directories(ascii-aquarium PRIVATE src)
+target_include_directories(ascii-aquarium PRIVATE src assets)
 
 if(TARGET SDL2::SDL2)
     target_link_libraries(ascii-aquarium PRIVATE SDL2::SDL2)

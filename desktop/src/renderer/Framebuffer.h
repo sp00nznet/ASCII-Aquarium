@@ -13,6 +13,8 @@
 #include <cstdint>
 #include <memory>
 
+#include "renderer/Font.h"
+
 namespace aq {
 
 class Framebuffer {
@@ -51,6 +53,27 @@ public:
     // Blit a tightly-packed RGB565 image into the framebuffer at (x, y).
     void pushImage(int x, int y, int w, int h, const std::uint16_t* data);
 
+    // ---- Stateful text, mirroring the TFT_eSPI / TFT_eSprite API ----
+    // Ported sketch code reads identically: setTextFont / setTextDatum /
+    // setTextColor / drawString / drawChar / textWidth / setCursor / println.
+
+    void setTextFont(int font);               // 1 or 2
+    void setTextSize(int size);               // glyph scale, always 1 upstream
+    void setTextDatum(int datum);             // TL_DATUM .. BR_DATUM
+    void setTextColor(std::uint16_t fg);                       // transparent bg
+    void setTextColor(std::uint16_t fg, std::uint16_t bg);     // opaque bg
+    void setTextWrap(bool wrap) { text_wrap_ = wrap; }
+    void setCursor(int x, int y) { cursor_x_ = x; cursor_y_ = y; }
+
+    // drawString honors the current datum; returns the drawn width.
+    int drawString(const char* str, int x, int y);
+    // drawChar draws one glyph top-left at (x, y) ignoring datum; returns width.
+    int drawChar(std::uint16_t uni_code, int x, int y);
+    // textWidth measures in the current font/size.
+    int textWidth(const char* str);
+    // println draws at the cursor (top-left) then advances to the next line.
+    void println(const char* str);
+
 private:
     void drawHLine(int x, int y, int w, std::uint16_t color);
     void drawVLine(int x, int y, int h, std::uint16_t color);
@@ -69,6 +92,17 @@ private:
     int width_;
     int height_;
     std::unique_ptr<std::uint16_t[]> pixels_;
+
+    // Text state.
+    FontId        text_font_  = FontId::Font1;
+    int           text_size_  = 1;
+    int           text_datum_ = kTopLeft;
+    std::uint16_t text_fg_    = 0xFFFF;
+    std::uint16_t text_bg_    = 0x0000;
+    bool          text_has_bg_ = false;
+    bool          text_wrap_  = true;
+    int           cursor_x_   = 0;
+    int           cursor_y_   = 0;
 };
 
 }  // namespace aq

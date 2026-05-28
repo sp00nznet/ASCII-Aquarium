@@ -179,6 +179,77 @@ void Framebuffer::fillRoundRect(int x, int y, int w, int h, int r,
     fillCircleHelper(x + r,         y + r, r, 2, h - 2 * r - 1, color);
 }
 
+// ---- Text ----
+
+void Framebuffer::setTextFont(int font) {
+    text_font_ = (font == 2) ? FontId::Font2 : FontId::Font1;
+}
+
+void Framebuffer::setTextSize(int size) {
+    text_size_ = (size < 1) ? 1 : size;
+}
+
+void Framebuffer::setTextDatum(int datum) {
+    text_datum_ = datum;
+}
+
+void Framebuffer::setTextColor(std::uint16_t fg) {
+    text_fg_ = fg;
+    text_has_bg_ = false;
+}
+
+void Framebuffer::setTextColor(std::uint16_t fg, std::uint16_t bg) {
+    text_fg_ = fg;
+    text_bg_ = bg;
+    text_has_bg_ = true;
+}
+
+int Framebuffer::textWidth(const char* str) {
+    return font::text_width(text_font_, str, text_size_);
+}
+
+int Framebuffer::drawString(const char* str, int x, int y) {
+    if (str == nullptr) return 0;
+    const int w = font::text_width(text_font_, str, text_size_);
+    const int h = font::glyph_height(text_font_) * text_size_;
+
+    // Horizontal datum bias.
+    switch (text_datum_) {
+        case kTopCentre: case kMidCentre: case kBotCentre: x -= w / 2; break;
+        case kTopRight:  case kMidRight:  case kBotRight:  x -= w;     break;
+        default: break;  // left
+    }
+    // Vertical datum bias.
+    switch (text_datum_) {
+        case kMidLeft: case kMidCentre: case kMidRight: y -= h / 2; break;
+        case kBotLeft: case kBotCentre: case kBotRight: y -= h;     break;
+        default: break;  // top
+    }
+
+    int cx = x;
+    for (const char* p = str; *p; ++p) {
+        cx += font::draw_char(*this, text_font_, *p, cx, y,
+                              text_fg_, text_bg_, text_has_bg_, text_size_);
+    }
+    return w;
+}
+
+int Framebuffer::drawChar(std::uint16_t uni_code, int x, int y) {
+    return font::draw_char(*this, text_font_, static_cast<char>(uni_code & 0xFF),
+                           x, y, text_fg_, text_bg_, text_has_bg_, text_size_);
+}
+
+void Framebuffer::println(const char* str) {
+    if (str != nullptr) {
+        int cx = cursor_x_;
+        for (const char* p = str; *p; ++p) {
+            cx += font::draw_char(*this, text_font_, *p, cx, cursor_y_,
+                                  text_fg_, text_bg_, text_has_bg_, text_size_);
+        }
+    }
+    cursor_y_ += font::glyph_height(text_font_) * text_size_;
+}
+
 void Framebuffer::pushImage(int x, int y, int w, int h,
                             const std::uint16_t* data) {
     if (w <= 0 || h <= 0 || data == nullptr) return;
