@@ -18,6 +18,7 @@
 #include "sim/Background.h"
 #include "sim/Clock.h"
 #include "sim/Rng.h"
+#include "ui/Hit.h"
 
 namespace {
 
@@ -157,6 +158,29 @@ int main(int argc, char* argv[]) {
     const Uint32 start_ticks = SDL_GetTicks();
     Uint32 last_ticks = start_ticks;
 
+    // Tap pipeline: both mouse clicks and touchscreen taps funnel through here,
+    // debounced like the device's TOUCH_DEBOUNCE_MS so a single touch (which SDL
+    // also reports as a synthetic mouse click) only registers once.
+    Uint32 last_tap_ticks = 0;
+    constexpr Uint32 kTapDebounceMs = 160;
+    auto dispatch_tap = [&](float lx, float ly) {
+        const Uint32 t = SDL_GetTicks();
+        if (t - last_tap_ticks < kTapDebounceMs) return;
+        last_tap_ticks = t;
+        const int x = static_cast<int>(lx);
+        const int y = static_cast<int>(ly);
+        // Task #8 will route the tap to the HUD/Settings panels first (via
+        // ui::inside hit-tests) and only feed when it lands in open water.
+        aquarium.spawnFlake(static_cast<float>(x), static_cast<float>(y));
+    };
+    // Convert a point in window pixels to the 320x240 logical canvas, honoring
+    // letterbox bars from integer scaling.
+    auto tap_from_window = [&](int wx, int wy) {
+        float lx = 0.0f, ly = 0.0f;
+        SDL_RenderWindowToLogical(renderer, wx, wy, &lx, &ly);
+        dispatch_tap(lx, ly);
+    };
+
     bool running = true;
     while (running) {
         SDL_Event ev;
@@ -193,12 +217,17 @@ int main(int argc, char* argv[]) {
                     break;
                 case SDL_MOUSEBUTTONDOWN:
                     if (ev.button.button == SDL_BUTTON_LEFT) {
-                        // Map window pixel coords to the 320x240 logical canvas.
-                        float lx = 0.0f, ly = 0.0f;
-                        SDL_RenderWindowToLogical(renderer, ev.button.x, ev.button.y, &lx, &ly);
-                        aquarium.spawnFlake(lx, ly);
+                        tap_from_window(ev.button.x, ev.button.y);
                     }
                     break;
+                case SDL_FINGERDOWN: {
+                    // Finger coords are normalized [0,1] over the window.
+                    int ww = 0, wh = 0;
+                    SDL_GetWindowSize(window, &ww, &wh);
+                    tap_from_window(static_cast<int>(ev.tfinger.x * ww),
+                                    static_cast<int>(ev.tfinger.y * wh));
+                    break;
+                }
                 default:
                     break;
             }
