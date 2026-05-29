@@ -16,6 +16,7 @@
 #include "renderer/Framebuffer.h"
 #include "sim/Aquarium.h"
 #include "sim/Background.h"
+#include "sim/Clock.h"
 #include "sim/Rng.h"
 
 namespace {
@@ -149,6 +150,8 @@ int main(int argc, char* argv[]) {
     // the Settings panel will cycle this once it lands.
     aq::BackgroundMode bg_mode = aq::BackgroundMode::BlueGradient;
 
+    aq::Clock clock;
+
     // Animation clock: monotonic ms since the loop started, so the simulation's
     // time base is independent of how long setup took.
     const Uint32 start_ticks = SDL_GetTicks();
@@ -172,6 +175,21 @@ int main(int argc, char* argv[]) {
                         SDL_RenderSetIntegerScale(renderer,
                             is_fullscreen(window) ? SDL_FALSE : SDL_TRUE);
                     }
+                    // Temporary debug keys until the Settings panel (task #8)
+                    // exposes these controls through the on-screen UI.
+                    else if (ev.key.keysym.sym == SDLK_b) {
+                        bg_mode = static_cast<aq::BackgroundMode>(
+                            (static_cast<int>(bg_mode) + 1) %
+                            static_cast<int>(aq::BackgroundMode::Count));
+                    } else if (ev.key.keysym.sym == SDLK_c) {
+                        clock.toggleVisible();
+                    } else if (ev.key.keysym.sym == SDLK_v) {
+                        clock.cycleStyle();
+                    } else if (ev.key.keysym.sym == SDLK_h) {
+                        clock.setUse24Hour(!clock.use24Hour());
+                    } else if (ev.key.keysym.sym == SDLK_m) {
+                        clock.setFlipHorizontal(!clock.flipHorizontal());
+                    }
                     break;
                 case SDL_MOUSEBUTTONDOWN:
                     if (ev.button.button == SDL_BUTTON_LEFT) {
@@ -193,8 +211,14 @@ int main(int argc, char* argv[]) {
         if (dt > 0.1f) dt = 0.1f;
 
         aquarium.update(dt, now_ticks - start_ticks);
+        clock.update();
+
+        // Draw order mirrors the sketch: background, the big ASCII clock layer
+        // (behind the fish), the live scene, then the small clock overlay.
         background.draw(fb, bg_mode);
+        clock.drawBackgroundLayer(fb);
         aquarium.draw(fb);
+        clock.drawOverlay(fb);
 
         SDL_UpdateTexture(texture, nullptr, fb.data(),
             static_cast<int>(fb.width() * sizeof(std::uint16_t)));
