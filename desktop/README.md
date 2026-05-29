@@ -29,9 +29,13 @@ Early port, in progress. Currently:
 - ✅ Input: debounced taps from mouse **and** touchscreen, mapped to the canvas
 - ✅ HUD + tabbed Settings panel (Tank / Seaweed / Clock / Backgrd) with the
   Clock style + color pop-overs, all wired to the live simulation
-- ⬜ WiFi / internet-time flow (likely simplified — desktops have OS time)
-- ⬜ Settings persistence (config file), screenshot/sequence capture, kiosk
-  autostart docs
+- ✅ Settings persistence (config file) — survives restarts
+- ✅ Screenshot + sequence capture (BMP) to disk
+- ✅ Kiosk autostart docs (see [`docs/KIOSK.md`](docs/KIOSK.md))
+
+The desktop port deliberately drops the device's WiFi / NTP internet-time
+flow: a desktop already has a correct system clock, which the on-screen clock
+reads directly.
 
 Right now if you build and run, the window opens at 640×480 (2x scale)
 showing the live aquarium: fish school and avoid each other over your chosen
@@ -41,9 +45,13 @@ drops a food flake** the fish swim toward and eat.
 Tap the top-left corner to reveal the HUD; the **S** button opens Settings
 (adjust fish/bubble counts, visitor frequency, seaweed, background, and the
 clock), and **R / H / O** respawn the school or summon a seahorse / octopus.
-Escape quits, F11 toggles fullscreen. Temporary keyboard shortcuts also exist:
-`B` cycles background, `C` toggles the clock, `V` its style, `H` 12/24h, `M`
-flip.
+Settings persist across runs. Escape quits, F11 toggles fullscreen, **F2**
+saves a screenshot, **F3** records a frame sequence. Temporary keyboard
+shortcuts also exist: `B` cycles background, `C` toggles the clock, `V` its
+style, `H` 12/24h, `M` flip.
+
+For running this unattended on a small display, see
+[`docs/KIOSK.md`](docs/KIOSK.md).
 
 ## Build
 

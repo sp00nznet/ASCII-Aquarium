@@ -1,0 +1,27 @@
+# systemd *user* service for the ASCII Aquarium kiosk.
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp desktop/packaging/ascii-aquarium.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now ascii-aquarium.service
+#
+# To run at boot without an interactive login:
+#   sudo loginctl enable-linger "$USER"
+#
+# Assumes the binary is on PATH (e.g. /usr/local/bin via `cmake --install`).
+# If it lives elsewhere, use an absolute path in ExecStart.
+
+[Unit]
+Description=ASCII Aquarium kiosk
+# Start once the graphical session is up.
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=ascii-aquarium --fullscreen --hide-cursor
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
