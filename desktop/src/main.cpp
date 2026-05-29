@@ -15,6 +15,7 @@
 #include "renderer/Color.h"
 #include "renderer/Framebuffer.h"
 #include "sim/Aquarium.h"
+#include "sim/Background.h"
 #include "sim/Rng.h"
 
 namespace {
@@ -143,6 +144,11 @@ int main(int argc, char* argv[]) {
     aq::Aquarium aquarium(rng);
     aquarium.init();
 
+    aq::Background background(rng);
+    // Default to the blue gradient (the sketch's DEFAULT_BACKGROUND_MODE);
+    // the Settings panel will cycle this once it lands.
+    aq::BackgroundMode bg_mode = aq::BackgroundMode::BlueGradient;
+
     // Animation clock: monotonic ms since the loop started, so the simulation's
     // time base is independent of how long setup took.
     const Uint32 start_ticks = SDL_GetTicks();
@@ -187,6 +193,7 @@ int main(int argc, char* argv[]) {
         if (dt > 0.1f) dt = 0.1f;
 
         aquarium.update(dt, now_ticks - start_ticks);
+        background.draw(fb, bg_mode);
         aquarium.draw(fb);
 
         SDL_UpdateTexture(texture, nullptr, fb.data(),

@@ -22,6 +22,7 @@ set(AQ_SOURCES
     src/renderer/Framebuffer.cpp
     src/renderer/Font.cpp
     src/sim/Aquarium.cpp
+    src/sim/Background.cpp
 )
 
 add_executable(ascii-aquarium ${AQ_SOURCES})

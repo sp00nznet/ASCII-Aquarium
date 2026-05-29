@@ -993,8 +993,8 @@ void Aquarium::drawSeahorse(Framebuffer& fb) const {
 }
 
 void Aquarium::draw(Framebuffer& fb) {
-    // Background gradients/flowers arrive in task #6; for now a flat sea.
-    fb.fillScreen(TFT_NAVY);
+    // The background is painted by the caller (Background::draw) before this,
+    // matching the sketch's drawBackground -> drawSeaweed -> ... order.
     fb.setTextFont(2);  // sketch's global default font for the scene
 
     drawSeaweed(fb);
