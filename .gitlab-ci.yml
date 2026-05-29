@@ -50,6 +50,7 @@ workflow:
 build:linux:
   stage: build
   tags: [linux, debian, shell]
+  timeout: 30m       # backstop: never let a wedged build occupy the runner for the full project timeout
   script:
     # Require the runner's system SDL2 (apt install libsdl2-dev); fail fast with
     # a clear message rather than hanging on a GitHub fetch if it's missing.
@@ -71,6 +72,7 @@ build:linux:
 build:windows:
   stage: build
   tags: [windows, win10, shell]
+  timeout: 30m
   script:
     - cmake -S desktop -B build-win -G "Visual Studio 17 2022" -A x64 -DAQ_BUNDLED_SDL2=ON
     - cmake --build build-win --config Release
@@ -87,6 +89,7 @@ build:windows:
 build:macos:
   stage: build
   tags: [macos, darwin, shell]
+  timeout: 30m
   script:
     # Homebrew's bin dir isn't on the gitlab-runner service account's
     # non-interactive PATH by default, so cmake (brew install cmake) isn't
