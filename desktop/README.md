@@ -76,19 +76,41 @@ Fedora/RHEL: `sudo dnf install gcc-c++ cmake SDL2-devel`
 Arch:        `sudo pacman -S base-devel cmake sdl2`
 Alpine:      `sudo apk add build-base cmake sdl2-dev`
 
-### Windows (secondary target)
+### Windows
 
-Recommended: install SDL2 via [vcpkg][vcpkg]:
+No SDL2 install needed — if CMake doesn't find a system SDL2 it fetches and
+statically builds it, producing a standalone `ascii-aquarium.exe` (no DLLs).
+With Visual Studio 2022 (Desktop C++ workload) and CMake on PATH:
 
 ```powershell
-vcpkg install sdl2:x64-windows
-cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE="C:/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake"
+cd desktop
+cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 .\build\Release\ascii-aquarium.exe
 ```
 
-Or download the SDL2 development libraries from [libsdl.org][sdl] and point
-CMake at them with `-DCMAKE_PREFIX_PATH=C:/path/to/SDL2`.
+On a HiDPI display the window appears in real pixels (so it looks small at low
+`--scale`); use a higher `--scale` or `--fullscreen`.
+
+### macOS
+
+With the Xcode Command Line Tools (`xcode-select --install`) and CMake:
+
+```bash
+cd desktop
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DAQ_BUNDLED_SDL2=ON
+cmake --build build -j
+./build/ascii-aquarium
+```
+
+`-DAQ_BUNDLED_SDL2=ON` fetches and static-links SDL2 for a self-contained
+binary; omit it to use a Homebrew `sdl2` instead.
+
+### CI / releases
+
+Pushes to the `buildforever.cloud` GitLab mirror run [`.gitlab-ci.yml`](../.gitlab-ci.yml),
+which builds Linux / Windows / macOS on tagged shell runners and drops the
+binaries on the `releases` SMB share under `ASCII-Aquarium/<branch-or-tag>/`.
 
 ## Layout
 
@@ -127,5 +149,3 @@ systemd `--user` unit example for Linux autostart and a Startup folder /
 Task Scheduler recipe for Windows.
 
 [upstream]: https://github.com/POWER-PILL/ASCII-Aquarium
-[vcpkg]: https://vcpkg.io/
-[sdl]: https://github.com/libsdl-org/SDL/releases

@@ -1,0 +1,142 @@
+# ============================================================================
+#  ASCII Aquarium — GitLab CI/CD  (buildforever.cloud)
+# ============================================================================
+#  Cross-platform C++/SDL2 desktop port (lives in desktop/). Builds on three
+#  shell runners (linux / windows / macos) and drops the binaries onto the
+#  `releases` SMB share at:
+#      \\$SMB_HOST\$SMB_SHARE\$CI_PROJECT_NAME\$CI_COMMIT_REF_SLUG\
+#  Same pattern as the Mantis / Futureburn pipelines.
+#
+#  ── One-time setup per runner (all use the shell executor) ─────────────────
+#  Linux   (tags: linux, debian, shell):
+#      apt install -y build-essential cmake libsdl2-dev
+#      Links the system SDL2 (deploy targets: `apt install libsdl2-2.0-0`).
+#  Windows (tags: windows, win10, shell):
+#      Visual Studio 2022 (Desktop C++ workload) + CMake on PATH.
+#      gitlab-runner registered with `--executor shell --shell pwsh`.
+#      No SDL install needed — CMake fetches & static-links SDL2 (standalone .exe).
+#  macOS   (tags: macos, darwin, shell):
+#      Xcode Command Line Tools (`xcode-select --install`) + CMake on PATH.
+#      No SDL install needed — CMake fetches & static-links SDL2.
+#
+#  Until a runner carrying a job's tags exists, that job stays "pending" — and
+#  because `deploy` needs all three builds, the pipeline waits on the missing
+#  runner. That's expected, not a failure.
+#
+#  Required CI/CD variables (Settings → CI/CD → Variables, masked):
+#      SMB_HOST       host or IP of the release SMB server
+#      SMB_SHARE      share name (e.g. releases)
+#      SMB_USER       service account username
+#      SMB_PASSWORD   masked password
+#  Without these the deploy job fails fast; delete it if you have no share.
+# ============================================================================
+
+stages:
+  - build
+  - deploy
+
+# Build on branch pushes, merge requests, tags, and manual web runs.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH
+
+# ─── build ──────────────────────────────────────────────────────────────────
+# One job per OS. Each compiles desktop/ and stages its output under
+# releases/<os>/ so deploy can grab the whole tree in one copy.
+
+build:linux:
+  stage: build
+  tags: [linux, debian, shell]
+  script:
+    - cmake -S desktop -B build -DCMAKE_BUILD_TYPE=Release
+    - cmake --build build -j
+    - ./build/ascii-aquarium --help        # smoke test: the binary loads & runs
+    - mkdir -p releases/linux
+    - cp build/ascii-aquarium releases/linux/
+    - cp desktop/README.md desktop/docs/KIOSK.md releases/linux/
+    - tar -C releases/linux -czf "releases/ascii-aquarium-linux-x64-$CI_COMMIT_SHORT_SHA.tar.gz" .
+    - ls -lh releases/ releases/linux/
+  artifacts:
+    name: "ascii-aquarium-linux-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - releases/linux/
+      - releases/ascii-aquarium-linux-x64-*.tar.gz
+    expire_in: 30 days
+
+build:windows:
+  stage: build
+  tags: [windows, win10, shell]
+  script:
+    - cmake -S desktop -B build-win -G "Visual Studio 17 2022" -A x64 -DAQ_BUNDLED_SDL2=ON
+    - cmake --build build-win --config Release
+    - New-Item -ItemType Directory -Force -Path releases/windows | Out-Null
+    - Copy-Item -Force build-win/Release/ascii-aquarium.exe releases/windows/
+    - Copy-Item -Force -Path desktop/README.md, desktop/docs/KIOSK.md -Destination releases/windows/
+    - Get-ChildItem releases/windows
+  artifacts:
+    name: "ascii-aquarium-windows-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - releases/windows/
+    expire_in: 30 days
+
+build:macos:
+  stage: build
+  tags: [macos, darwin, shell]
+  script:
+    - cmake -S desktop -B build -DCMAKE_BUILD_TYPE=Release -DAQ_BUNDLED_SDL2=ON
+    - cmake --build build -j
+    - mkdir -p releases/macos
+    - cp build/ascii-aquarium releases/macos/
+    - cp desktop/README.md desktop/docs/KIOSK.md releases/macos/
+    - tar -C releases/macos -czf "releases/ascii-aquarium-macos-$CI_COMMIT_SHORT_SHA.tar.gz" .
+    - ls -lh releases/ releases/macos/
+  artifacts:
+    name: "ascii-aquarium-macos-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - releases/macos/
+      - releases/ascii-aquarium-macos-*.tar.gz
+    expire_in: 30 days
+
+# ─── deploy ─────────────────────────────────────────────────────────────────
+# Collect every build's artifacts and drop them on the SMB share at
+# \\$SMB_HOST\$SMB_SHARE\$CI_PROJECT_NAME\$CI_COMMIT_REF_SLUG\ — every push to
+# main overwrites the main/ slot; git tags land in their own subdir. Runs on
+# the Windows runner (PowerShell's New-PSDrive is the cleanest SMB mount) and
+# only on main, tags, or manual web triggers.
+deploy:
+  stage: deploy
+  tags: [windows, win10, shell]
+  needs:
+    - job: build:linux
+      artifacts: true
+    - job: build:windows
+      artifacts: true
+    - job: build:macos
+      artifacts: true
+  variables:
+    DEST_SUBDIR: '$CI_PROJECT_NAME/$CI_COMMIT_REF_SLUG'
+  script:
+    - |
+      if (-not $env:SMB_HOST -or -not $env:SMB_SHARE -or -not $env:SMB_USER -or -not $env:SMB_PASSWORD) {
+        Write-Error "Missing SMB_HOST/SMB_SHARE/SMB_USER/SMB_PASSWORD CI vars. Set them in Project Settings -> CI/CD -> Variables."
+        exit 1
+      }
+      $cred = New-Object System.Management.Automation.PSCredential(
+                "$env:SMB_USER",
+                (ConvertTo-SecureString "$env:SMB_PASSWORD" -AsPlainText -Force))
+      New-PSDrive -Name R -PSProvider FileSystem `
+                  -Root "\\$env:SMB_HOST\$env:SMB_SHARE" `
+                  -Credential $cred -ErrorAction Stop | Out-Null
+      $target = "R:\$env:DEST_SUBDIR"
+      New-Item -ItemType Directory -Force -Path $target | Out-Null
+      Copy-Item -Recurse -Force releases/* "$target/"
+      "Deployed to \\$env:SMB_HOST\$env:SMB_SHARE\$env:DEST_SUBDIR"
+      Get-ChildItem -Recurse "$target" | Select-Object FullName, Length
+      Remove-PSDrive -Name R
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_COMMIT_BRANCH == "main"

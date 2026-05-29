@@ -18,9 +18,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # SDL2: prefer a system install (e.g. Linux `apt install libsdl2-dev`); if none
 # is found (typical on Windows), download and build it automatically so the
 # project stays a one-command build everywhere.
-find_package(SDL2 QUIET)
-if(NOT SDL2_FOUND)
-    message(STATUS "System SDL2 not found — fetching and building SDL2 from source")
+#
+# AQ_BUNDLED_SDL2=ON forces the fetch-and-static-build path even when a system
+# SDL2 exists — used by the CI release builds (Windows/macOS) to produce a
+# standalone binary with no SDL2 runtime dependency.
+option(AQ_BUNDLED_SDL2 "Fetch and statically build SDL2 instead of using a system install" OFF)
+
+function(aq_fetch_sdl2)
+    message(STATUS "Fetching and statically building SDL2 from source")
     include(FetchContent)
     set(SDL_SHARED OFF CACHE BOOL "" FORCE)
     set(SDL_STATIC ON  CACHE BOOL "" FORCE)
@@ -30,6 +35,16 @@ if(NOT SDL2_FOUND)
         URL https://github.com/libsdl-org/SDL/releases/download/release-2.32.4/SDL2-2.32.4.zip
     )
     FetchContent_MakeAvailable(SDL2)
+endfunction()
+
+if(AQ_BUNDLED_SDL2)
+    aq_fetch_sdl2()
+else()
+    find_package(SDL2 QUIET)
+    if(NOT SDL2_FOUND)
+        message(STATUS "System SDL2 not found — falling back to a bundled build")
+        aq_fetch_sdl2()
+    endif()
 endif()
 
 set(AQ_SOURCES
