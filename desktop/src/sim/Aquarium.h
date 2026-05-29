@@ -81,6 +81,36 @@ struct Seahorse {
     unsigned long nextSpawnMs = 0;
 };
 
+// A crab that scuttles sideways along the sand.
+struct Crab {
+    bool active = false;
+    float x = 0, y = 0;
+    float vx = 0;
+    float phase = 0;
+    unsigned long nextSpawnMs = 0;
+};
+
+// A jellyfish that drifts and bobs while its bell pulses.
+struct Jellyfish {
+    bool active = false;
+    float x = 0, y = 0;
+    float baseY = 0;
+    float vx = 0;
+    float phase = 0;
+    unsigned long nextSpawnMs = 0;
+};
+
+// A rare large shark that crosses the tank; nearby fish flee.
+struct Shark {
+    bool active = false;
+    bool facingRight = false;
+    float x = 0, y = 0;
+    float baseY = 0;
+    float vx = 0;
+    float phase = 0;
+    unsigned long nextSpawnMs = 0;
+};
+
 class Aquarium {
 public:
     explicit Aquarium(Rng& rng);
@@ -132,6 +162,11 @@ public:
     void spawnOctopusAtCenter();
     void spawnSeahorseAtCenter();
 
+    // Summon the new creatures now (debug keys / on-demand).
+    void spawnCrabNow();
+    void spawnJellyfishNow();
+    void spawnSharkNow();
+
 private:
     // --- population management ---
     void activateFish(Fish& f, bool activeNow);
@@ -151,12 +186,16 @@ private:
     void updateFish(float dt);
     void updateOctopus(unsigned long now, float dt);
     void updateSeahorse(unsigned long now, float dt);
+    void updateCrab(unsigned long now, float dt);
+    void updateJellyfish(unsigned long now, float dt);
+    void updateShark(unsigned long now, float dt);
     void keepVisitorsSeparated();
 
     // --- fish steering helpers ---
     int closestFlakeForFish(const Fish& f, float maxDist) const;
     void steerFishAwayFromOctopus(Fish& f, float cx, float cy, float dt) const;
     void steerFishAwayFromSeahorse(Fish& f, float cx, float cy, float dt) const;
+    void steerFishAwayFromShark(Fish& f, float cx, float cy, float dt) const;
     void keepFishOutsideOctopus(Fish& f) const;
     void keepFishOutsideSeahorse(Fish& f) const;
 
@@ -177,6 +216,9 @@ private:
     void drawFish(Framebuffer& fb) const;
     void drawOctopus(Framebuffer& fb) const;
     void drawSeahorse(Framebuffer& fb) const;
+    void drawCrab(Framebuffer& fb) const;
+    void drawJellyfish(Framebuffer& fb) const;
+    void drawShark(Framebuffer& fb) const;
 
     // --- glyph metrics (computed in init from Font 2) ---
     void initFishMirrors();
@@ -200,11 +242,14 @@ private:
     std::int16_t fishGlyphOffsetRight_[kGlyphCount][kFishGlyphBuf];
     std::int16_t fishGlyphOffsetLeft_[kGlyphCount][kFishGlyphBuf];
 
-    Fish     fishPool_[kMaxFishPool];
-    Flake    flakes_[kMaxFlakes];
-    Bubble   bubbles_[kMaxBubbles];
-    Octopus  octopus_;
-    Seahorse seahorse_;
+    Fish      fishPool_[kMaxFishPool];
+    Flake     flakes_[kMaxFlakes];
+    Bubble    bubbles_[kMaxBubbles];
+    Octopus   octopus_;
+    Seahorse  seahorse_;
+    Crab      crab_;
+    Jellyfish jellyfish_;
+    Shark     shark_;
 
     int   fishTargetCount_;
     int   bubbleTargetCount_;

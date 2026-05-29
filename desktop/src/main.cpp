@@ -259,6 +259,12 @@ int main(int argc, char* argv[]) {
                         lighting.setDayNight(!lighting.dayNight());
                     } else if (ev.key.keysym.sym == SDLK_l) {
                         lighting.setCaustics(!lighting.caustics());
+                    } else if (ev.key.keysym.sym == SDLK_k) {
+                        aquarium.spawnCrabNow();
+                    } else if (ev.key.keysym.sym == SDLK_j) {
+                        aquarium.spawnJellyfishNow();
+                    } else if (ev.key.keysym.sym == SDLK_F4) {
+                        aquarium.spawnSharkNow();
                     }
                     break;
                 case SDL_MOUSEBUTTONDOWN:

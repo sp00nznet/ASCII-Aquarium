@@ -59,6 +59,18 @@ constexpr float kSeahorseSpeedBoost = 1.18f;
 constexpr float kVisitorClearRadiusX = 56.0f;
 constexpr float kVisitorClearRadiusY = 38.0f;
 
+// Shark: a big predator — wide, strong avoidance so the school scatters.
+constexpr float kSharkExitPad = 70.0f;
+constexpr float kSharkCenterYOffset = 12.0f;
+constexpr float kSharkFishAvoidRadiusX = 120.0f;
+constexpr float kSharkFishAvoidRadiusY = 60.0f;
+constexpr float kSharkFishAvoidStrength = 14.0f;
+
+// New-creature spawn cadence (ms). First appearance is sooner (see update*).
+constexpr unsigned long kCrabIntervalMs = 180000UL;       // ~3 min
+constexpr unsigned long kJellyfishIntervalMs = 240000UL;  // ~4 min
+constexpr unsigned long kSharkIntervalMs = 600000UL;      // ~10 min
+
 constexpr float kTwoPi = 6.28318f;
 
 template <typename T>
@@ -555,6 +567,24 @@ void Aquarium::steerFishAwayFromSeahorse(Fish& f, float fishCenterX, float fishC
     f.vy += (dy / dist) * push * kSeahorseFishAvoidStrength * dt;
 }
 
+void Aquarium::steerFishAwayFromShark(Fish& f, float fishCenterX, float fishCenterY,
+                                      float dt) const {
+    if (!shark_.active) return;
+    float sharkCenterX = shark_.x;
+    float sharkCenterY = shark_.y + kSharkCenterYOffset;
+    float dx = fishCenterX - sharkCenterX;
+    float dy = fishCenterY - sharkCenterY;
+    float sx = dx / kSharkFishAvoidRadiusX;
+    float sy = dy / kSharkFishAvoidRadiusY;
+    float scaledD2 = sx * sx + sy * sy;
+    if (scaledD2 <= 0.0001f || scaledD2 >= 1.0f) return;
+    float dist = std::sqrt(dx * dx + dy * dy) + 0.0001f;
+    float push = 1.0f - scaledD2;
+    push *= push;
+    f.vx += (dx / dist) * push * kSharkFishAvoidStrength * dt;
+    f.vy += (dy / dist) * push * kSharkFishAvoidStrength * dt;
+}
+
 void Aquarium::keepFishOutsideOctopus(Fish& f) const {
     if (!octopus_.active) return;
     float fishCenterX = f.x + f.visualWidth * 0.5f;
@@ -691,6 +721,7 @@ void Aquarium::updateFish(float dt) {
 
         steerFishAwayFromOctopus(f, fCenterX, fCenterY, dt);
         steerFishAwayFromSeahorse(f, fCenterX, fCenterY, dt);
+        steerFishAwayFromShark(f, fCenterX, fCenterY, dt);
 
         // Gentle steering separation, not hard collision.
         if (repelCount > 0) {
@@ -880,6 +911,89 @@ void Aquarium::keepVisitorsSeparated() {
     octopus_.y -= pushY * 0.55f;
 }
 
+// --- crab ---
+void Aquarium::spawnCrabNow() {
+    bool fromLeft = (rng_.random(100) < 50);
+    crab_.active = true;
+    crab_.vx = fromLeft ? rng_.frand(14.0f, 24.0f) : -rng_.frand(14.0f, 24.0f);
+    crab_.x = fromLeft ? -24.0f : (kScreenW + 24.0f);
+    crab_.y = kSeaLevelY + 14.0f;   // resting on the sand
+    crab_.phase = rng_.frand(0.0f, kTwoPi);
+    crab_.nextSpawnMs = nowMs_ + kCrabIntervalMs;
+}
+
+void Aquarium::updateCrab(unsigned long now, float dt) {
+    if (!crab_.active) {
+        if (crab_.nextSpawnMs == 0)
+            crab_.nextSpawnMs = now + static_cast<unsigned long>(rng_.frand(8000.0f, 22000.0f));
+        else if (timeReached(now, crab_.nextSpawnMs))
+            spawnCrabNow();
+        return;
+    }
+    crab_.x += crab_.vx * dt;
+    crab_.phase += dt;
+    if ((crab_.vx > 0.0f && crab_.x > kScreenW + 24.0f) ||
+        (crab_.vx < 0.0f && crab_.x < -24.0f))
+        crab_.active = false;
+}
+
+// --- jellyfish ---
+void Aquarium::spawnJellyfishNow() {
+    bool fromLeft = (rng_.random(100) < 50);
+    jellyfish_.active = true;
+    jellyfish_.vx = fromLeft ? rng_.frand(4.0f, 9.0f) : -rng_.frand(4.0f, 9.0f);
+    jellyfish_.x = fromLeft ? -16.0f : (kScreenW + 16.0f);
+    jellyfish_.baseY = rng_.frand(28.0f, static_cast<float>(kSeaLevelY) - 70.0f);
+    jellyfish_.y = jellyfish_.baseY;
+    jellyfish_.phase = rng_.frand(0.0f, kTwoPi);
+    jellyfish_.nextSpawnMs = nowMs_ + kJellyfishIntervalMs;
+}
+
+void Aquarium::updateJellyfish(unsigned long now, float dt) {
+    if (!jellyfish_.active) {
+        if (jellyfish_.nextSpawnMs == 0)
+            jellyfish_.nextSpawnMs = now + static_cast<unsigned long>(rng_.frand(12000.0f, 30000.0f));
+        else if (timeReached(now, jellyfish_.nextSpawnMs))
+            spawnJellyfishNow();
+        return;
+    }
+    float t = now * 0.001f;
+    jellyfish_.x += jellyfish_.vx * dt;
+    jellyfish_.y = jellyfish_.baseY + std::sin(t * 0.7f + jellyfish_.phase) * 10.0f;
+    if ((jellyfish_.vx > 0.0f && jellyfish_.x > kScreenW + 20.0f) ||
+        (jellyfish_.vx < 0.0f && jellyfish_.x < -20.0f))
+        jellyfish_.active = false;
+}
+
+// --- shark ---
+void Aquarium::spawnSharkNow() {
+    bool fromLeft = (rng_.random(100) < 50);
+    shark_.active = true;
+    shark_.facingRight = fromLeft;
+    shark_.vx = fromLeft ? rng_.frand(22.0f, 34.0f) : -rng_.frand(22.0f, 34.0f);
+    shark_.x = fromLeft ? -kSharkExitPad : (kScreenW + kSharkExitPad);
+    shark_.baseY = rng_.frand(40.0f, static_cast<float>(kSeaLevelY) - 50.0f);
+    shark_.y = shark_.baseY;
+    shark_.phase = rng_.frand(0.0f, kTwoPi);
+    shark_.nextSpawnMs = nowMs_ + kSharkIntervalMs;
+}
+
+void Aquarium::updateShark(unsigned long now, float dt) {
+    if (!shark_.active) {
+        if (shark_.nextSpawnMs == 0)
+            shark_.nextSpawnMs = now + static_cast<unsigned long>(rng_.frand(20000.0f, 45000.0f));
+        else if (timeReached(now, shark_.nextSpawnMs))
+            spawnSharkNow();
+        return;
+    }
+    float t = now * 0.001f;
+    shark_.x += shark_.vx * dt;
+    shark_.y = shark_.baseY + std::sin(t * 0.5f + shark_.phase) * 5.0f;
+    if ((shark_.vx > 0.0f && shark_.x > kScreenW + kSharkExitPad) ||
+        (shark_.vx < 0.0f && shark_.x < -kSharkExitPad))
+        shark_.active = false;
+}
+
 void Aquarium::update(float dt, unsigned long nowMs) {
     nowMs_ = nowMs;
     tSec_ = nowMs * 0.001f;
@@ -888,6 +1002,9 @@ void Aquarium::update(float dt, unsigned long nowMs) {
     updateFish(dt);
     updateOctopus(nowMs, dt);
     updateSeahorse(nowMs, dt);
+    updateCrab(nowMs, dt);
+    updateJellyfish(nowMs, dt);
+    updateShark(nowMs, dt);
     keepVisitorsSeparated();
 }
 
@@ -1084,17 +1201,89 @@ void Aquarium::drawSeahorse(Framebuffer& fb) const {
     fb.setTextFont(2);
 }
 
+void Aquarium::drawCrab(Framebuffer& fb) const {
+    if (!crab_.active) return;
+    const int x = static_cast<int>(crab_.x), y = static_cast<int>(crab_.y);
+    const bool altLegs = (static_cast<int>(crab_.phase * 6.0f) & 1) != 0;
+    const char* top = "\\(oo)/";
+    const char* legs = altLegs ? "/||||\\" : "\\||||/";
+    fb.setTextFont(1);
+    fb.setTextSize(1);
+    fb.setTextDatum(TL_DATUM);
+    fb.setTextColor(TFT_RED);
+    for (int c = 0; top[c]; ++c)
+        if (top[c] != ' ') fb.drawChar(static_cast<std::uint16_t>(top[c]), x + c * 6, y);
+    for (int c = 0; legs[c]; ++c)
+        if (legs[c] != ' ') fb.drawChar(static_cast<std::uint16_t>(legs[c]), x + c * 6, y + 8);
+    fb.setTextFont(2);
+}
+
+void Aquarium::drawJellyfish(Framebuffer& fb) const {
+    if (!jellyfish_.active) return;
+    const int x = static_cast<int>(jellyfish_.x), y = static_cast<int>(jellyfish_.y);
+    fb.setTextFont(1);
+    fb.setTextSize(1);
+    fb.setTextDatum(TL_DATUM);
+    fb.setTextColor(TFT_VIOLET);
+    const char* bellTop = " __ ";
+    const char* bellBot = "/  \\";
+    for (int c = 0; bellTop[c]; ++c)
+        if (bellTop[c] != ' ') fb.drawChar(static_cast<std::uint16_t>(bellTop[c]), x + c * 6, y);
+    for (int c = 0; bellBot[c]; ++c)
+        if (bellBot[c] != ' ') fb.drawChar(static_cast<std::uint16_t>(bellBot[c]), x + c * 6, y + 8);
+    // Trailing tentacles, waving.
+    for (int i = 0; i < 4; ++i) {
+        int tx = x + i * 6 + static_cast<int>(std::sin(tSec_ * 3.0f + i + jellyfish_.phase) * 1.6f);
+        fb.drawChar('|', tx, y + 16);
+    }
+    fb.setTextFont(2);
+}
+
+void Aquarium::drawShark(Framebuffer& fb) const {
+    if (!shark_.active) return;
+    static const char* rows[] = {
+        "   ^    ",
+        " _____  ",
+        "(  o   >",
+        " \\vvvv/ ",
+    };
+    const int kRows = 4, kCols = 8;
+    const int x = static_cast<int>(shark_.x), y = static_cast<int>(shark_.y);
+    fb.setTextFont(1);
+    fb.setTextSize(1);
+    fb.setTextDatum(TL_DATUM);
+    fb.setTextColor(rgb565(140, 150, 165));
+    for (int r = 0; r < kRows; ++r) {
+        const char* line = rows[r];
+        int len = static_cast<int>(std::strlen(line));
+        for (int col = 0; col < kCols; ++col) {
+            char g = (col < len) ? line[col] : ' ';
+            int drawCol = col;
+            if (!shark_.facingRight) {
+                drawCol = kCols - 1 - col;
+                g = mirrorSeahorseGlyph(g);
+            }
+            if (g == ' ') continue;
+            fb.drawChar(static_cast<std::uint16_t>(g), x + drawCol * 6, y + r * 8);
+        }
+    }
+    fb.setTextFont(2);
+}
+
 void Aquarium::draw(Framebuffer& fb) {
     // The background is painted by the caller (Background::draw) before this,
     // matching the sketch's drawBackground -> drawSeaweed -> ... order.
     fb.setTextFont(2);  // sketch's global default font for the scene
 
     drawSeaweed(fb);
+    drawCrab(fb);        // scuttles on the sand, behind the swimmers
     drawBubbles(fb);
     drawFlakes(fb);
     drawFish(fb);
     drawOctopus(fb);
     drawSeahorse(fb);
+    drawJellyfish(fb);
+    drawShark(fb);       // big and in front
 }
 
 }  // namespace aq
