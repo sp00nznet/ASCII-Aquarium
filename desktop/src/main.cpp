@@ -18,6 +18,7 @@
 #include "sim/Aquarium.h"
 #include "sim/Background.h"
 #include "sim/Clock.h"
+#include "sim/Lighting.h"
 #include "sim/Rng.h"
 #include "ui/Ui.h"
 #include "app/Capture.h"
@@ -169,6 +170,7 @@ int main(int argc, char* argv[]) {
     aq::Background background(rng);
     aq::BackgroundMode bg_mode = aq::BackgroundMode::BlueGradient;
     aq::Clock clock;
+    aq::Lighting lighting;
 
     // Load saved settings (if any) and apply them before populating the tank,
     // so the fish count etc. are correct on the first frame.
@@ -251,6 +253,10 @@ int main(int argc, char* argv[]) {
                     } else if (ev.key.keysym.sym == SDLK_F3) {
                         capture.toggleSequence();
                         show_toast(SDL_GetTicks());
+                    } else if (ev.key.keysym.sym == SDLK_n) {
+                        lighting.setDayNight(!lighting.dayNight());
+                    } else if (ev.key.keysym.sym == SDLK_l) {
+                        lighting.setCaustics(!lighting.caustics());
                     }
                     break;
                 case SDL_MOUSEBUTTONDOWN:
@@ -294,13 +300,17 @@ int main(int argc, char* argv[]) {
 
         aquarium.update(dt, now_ticks - start_ticks);
         clock.update();
+        lighting.update(dt, clock.hourOfDay());
 
-        // Draw order mirrors the sketch: background, the big ASCII clock layer
-        // (behind the fish), the live scene, the small clock overlay, then the
-        // HUD/Settings chrome on top.
+        // Draw order: background, the big ASCII clock layer (behind the fish),
+        // the live scene, the caustic light shafts, then the day/night ambient
+        // wash over the whole tank — and finally the small clock overlay + the
+        // HUD/Settings chrome on top at full brightness so they stay readable.
         background.draw(fb, bg_mode);
         clock.drawBackgroundLayer(fb);
         aquarium.draw(fb);
+        lighting.drawCaustics(fb);
+        lighting.applyAmbient(fb);
         clock.drawOverlay(fb);
         ui.draw(fb, fps);
 

@@ -66,6 +66,7 @@ set(AQ_SOURCES
     src/sim/Aquarium.cpp
     src/sim/Background.cpp
     src/sim/Clock.cpp
+    src/sim/Lighting.cpp
     src/ui/Ui.cpp
     src/app/Config.cpp
     src/app/Capture.cpp

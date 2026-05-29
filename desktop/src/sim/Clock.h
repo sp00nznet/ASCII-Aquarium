@@ -25,6 +25,9 @@ public:
     // Refresh the displayed time from the OS local clock. Call once per frame.
     void update();
 
+    // Local time of day as a fractional hour [0, 24) — drives the day/night cycle.
+    float hourOfDay() const { return hour_ + minute_ / 60.0f; }
+
     // Big ASCII-art clock sits behind the fish (drawn right after the
     // background); the small text clock is an overlay drawn after the entities.
     void drawBackgroundLayer(Framebuffer& fb);
