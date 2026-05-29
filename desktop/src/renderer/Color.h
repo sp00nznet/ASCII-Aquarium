@@ -18,6 +18,26 @@ constexpr std::uint16_t rgb565(std::uint8_t r, std::uint8_t g, std::uint8_t b) {
         ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
 }
 
+// Multiply a packed RGB565 color's channels by `brightness` in [0, 1]. Used by
+// the aquarium to dim fish by depth. Matches the upstream scaleRgb565.
+inline std::uint16_t scaleRgb565(std::uint16_t color, float brightness) {
+    if (brightness < 0.0f) brightness = 0.0f;
+    if (brightness > 1.0f) brightness = 1.0f;
+    const auto r = static_cast<std::uint16_t>(((color >> 11) & 0x1F) * brightness);
+    const auto g = static_cast<std::uint16_t>(((color >> 5) & 0x3F) * brightness);
+    const auto b = static_cast<std::uint16_t>((color & 0x1F) * brightness);
+    return static_cast<std::uint16_t>((r << 11) | (g << 5) | b);
+}
+
+// Pack an RGB888 triple (channels clamped to [0, 255]) into RGB565. Matches the
+// upstream rgb565From888; used for the octopus/seahorse animated tints.
+inline std::uint16_t rgb565From888(int r8, int g8, int b8) {
+    const auto clamp8 = [](int v) { return v < 0 ? 0 : (v > 255 ? 255 : v); };
+    return rgb565(static_cast<std::uint8_t>(clamp8(r8)),
+                  static_cast<std::uint8_t>(clamp8(g8)),
+                  static_cast<std::uint8_t>(clamp8(b8)));
+}
+
 namespace color {
 
 // Values copied from TFT_eSPI's color definitions. Kept verbatim so a `git
@@ -77,3 +97,7 @@ inline constexpr std::uint16_t Violet       = 0x915C;
 #define TFT_SILVER       ::aq::color::Silver
 #define TFT_SKYBLUE      ::aq::color::SkyBlue
 #define TFT_VIOLET       ::aq::color::Violet
+
+// Upstream's RGB565(r,g,b) packing macro, so ported tables (e.g. fishSpecies)
+// read identically to the original sketch.
+#define RGB565           ::aq::rgb565

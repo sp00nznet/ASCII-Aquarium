@@ -19,15 +19,20 @@ Early port, in progress. Currently:
   Font 2 16px proportional) with a TFT_eSPI-style text API
   (`setTextFont`/`setTextDatum`/`setTextColor`/`drawString`/`drawChar`/
   `textWidth`/`setCursor`/`println`)
-- ⬜ Aquarium simulation port (fish, bubbles, flakes, seaweed, visitors)
-- ⬜ Backgrounds, HUD + settings panels, on-screen keyboard
+- ✅ Aquarium core simulation (`src/sim/`): schooling fish with depth tint
+  and swim-wave animation, rising bubbles, sinking food flakes, swaying
+  seaweed, and the two occasional visitors (octopus, seahorse) — ported
+  faithfully from the upstream sketch's update/draw math
+- ⬜ Background modes (black, blue/purple gradient, flowers)
+- ⬜ HUD + settings panels, on-screen keyboard
 - ⬜ Settings persistence, clock, BMP capture, kiosk autostart docs
 
 Right now if you build and run, the window opens at 640×480 (2x scale)
-showing a centered round-rect panel with a drifting band, the title
-"ASCII Aquarium" in Font 2, a Font-1 subtitle, and a live frame counter —
-placeholder content that exercises every renderer primitive and both
-bitmap fonts end to end. It gets replaced once the aquarium simulation lands.
+showing the live aquarium over a flat navy sea (real backgrounds land next):
+fish school and avoid each other, bubbles rise, seaweed sways, and
+**left-clicking drops a food flake** the fish swim toward and eat. The
+octopus and seahorse appear on a timer (~once an hour by default). Escape
+quits, F11 toggles fullscreen.
 
 ## Build
 
