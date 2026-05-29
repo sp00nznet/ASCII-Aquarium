@@ -121,6 +121,8 @@ public:
     void nudgeBubbles(int delta);
     void cycleOctopusFrequency(int delta);
     void cycleSeahorseFrequency(int delta);
+    void setOctopusFrequency(int freq);   // snaps to nearest valid option
+    void setSeahorseFrequency(int freq);
     void nudgeSeaweedSway(float delta);
     void nudgeSeaweedLength(float delta);
     void nudgeSeaweedRandomness(float delta);

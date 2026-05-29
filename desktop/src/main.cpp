@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #include "renderer/Color.h"
 #include "renderer/Framebuffer.h"
@@ -19,6 +20,7 @@
 #include "sim/Clock.h"
 #include "sim/Rng.h"
 #include "ui/Ui.h"
+#include "app/Config.h"
 
 namespace {
 
@@ -144,15 +146,25 @@ int main(int argc, char* argv[]) {
 
     aq::Rng rng(static_cast<std::uint32_t>(SDL_GetPerformanceCounter()));
     aq::Aquarium aquarium(rng);
+    aq::Background background(rng);
+    aq::BackgroundMode bg_mode = aq::BackgroundMode::BlueGradient;
+    aq::Clock clock;
+
+    // Load saved settings (if any) and apply them before populating the tank,
+    // so the fish count etc. are correct on the first frame.
+    const std::string config_path = aq::config::filePath();
+    aq::config::Settings settings = aq::config::snapshot(aquarium, clock, bg_mode);
+    aq::config::load(config_path, settings);
+    aq::config::apply(settings, aquarium, clock, bg_mode);
     aquarium.init();
 
-    aq::Background background(rng);
-    // Default to the blue gradient (the sketch's DEFAULT_BACKGROUND_MODE);
-    // the Settings panel will cycle this once it lands.
-    aq::BackgroundMode bg_mode = aq::BackgroundMode::BlueGradient;
-
-    aq::Clock clock;
     aq::ui::Ui ui(aquarium, background, clock, bg_mode);
+
+    // Debounced settings autosave: save 1.2s after the last change (matching
+    // the device), plus a final save on exit.
+    aq::config::Settings saved_settings = aq::config::snapshot(aquarium, clock, bg_mode);
+    aq::config::Settings prev_settings = saved_settings;
+    Uint32 last_change_ticks = 0;
 
     // Animation clock: monotonic ms since the loop started, so the simulation's
     // time base is independent of how long setup took.
@@ -243,6 +255,19 @@ int main(int argc, char* argv[]) {
         if (dt > 0.1f) dt = 0.1f;
         if (dt > 0.0f) fps = fps * 0.9f + (1.0f / dt) * 0.1f;  // smoothed
 
+        // Debounced settings autosave: reset the timer whenever a setting
+        // changes, and write once it has been stable for 1.2s.
+        {
+            aq::config::Settings cur = aq::config::snapshot(aquarium, clock, bg_mode);
+            if (cur != prev_settings) {
+                last_change_ticks = now_ticks;
+                prev_settings = cur;
+            }
+            if (cur != saved_settings && now_ticks - last_change_ticks >= 1200) {
+                if (aq::config::save(config_path, cur)) saved_settings = cur;
+            }
+        }
+
         aquarium.update(dt, now_ticks - start_ticks);
         clock.update();
 
@@ -261,6 +286,12 @@ int main(int argc, char* argv[]) {
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, nullptr, nullptr);
         SDL_RenderPresent(renderer);
+    }
+
+    // Flush any unsaved settings on exit.
+    {
+        aq::config::Settings cur = aq::config::snapshot(aquarium, clock, bg_mode);
+        if (cur != saved_settings) aq::config::save(config_path, cur);
     }
 
     SDL_DestroyTexture(texture);

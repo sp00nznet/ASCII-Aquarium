@@ -57,6 +57,12 @@ public:
         if (style_ == ClockStyle::Ascii) asciiTextColor_ = c; else smallTextColor_ = c;
     }
 
+    // Direct per-style color access (for persistence).
+    std::uint16_t smallTextColor() const { return smallTextColor_; }
+    std::uint16_t asciiTextColor() const { return asciiTextColor_; }
+    void setSmallTextColor(std::uint16_t c) { smallTextColor_ = c; }
+    void setAsciiTextColor(std::uint16_t c) { asciiTextColor_ = c; }
+
     // Selectable text-color palette (for the Settings color picker grid).
     static int paletteCount();
     static std::uint16_t paletteColor(int i);

@@ -443,6 +443,16 @@ void Aquarium::cycleSeahorseFrequency(int delta) {
     if (!seahorse_.active) seahorse_.nextSpawnMs = 0;
 }
 
+void Aquarium::setOctopusFrequency(int freq) {
+    octopusFrequency_ = normalizeFrequency(freq, kOctopusFreqOptions, 6);
+    if (!octopus_.active) octopus_.nextSpawnMs = 0;
+}
+
+void Aquarium::setSeahorseFrequency(int freq) {
+    seahorseFrequency_ = normalizeFrequency(freq, kSeahorseFreqOptions, 6);
+    if (!seahorse_.active) seahorse_.nextSpawnMs = 0;
+}
+
 void Aquarium::nudgeSeaweedSway(float delta) {
     seaweedSwaySpeed_ = clampVal(seaweedSwaySpeed_ + delta, kMinSway, kMaxSway);
 }

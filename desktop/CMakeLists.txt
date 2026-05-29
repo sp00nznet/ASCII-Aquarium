@@ -25,6 +25,7 @@ set(AQ_SOURCES
     src/sim/Background.cpp
     src/sim/Clock.cpp
     src/ui/Ui.cpp
+    src/app/Config.cpp
 )
 
 add_executable(ascii-aquarium ${AQ_SOURCES})
