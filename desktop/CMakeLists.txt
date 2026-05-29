@@ -67,6 +67,7 @@ set(AQ_SOURCES
     src/sim/Background.cpp
     src/sim/Clock.cpp
     src/sim/Lighting.cpp
+    src/sim/Props.cpp
     src/ui/Ui.cpp
     src/app/Config.cpp
     src/app/Capture.cpp

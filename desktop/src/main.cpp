@@ -19,6 +19,7 @@
 #include "sim/Background.h"
 #include "sim/Clock.h"
 #include "sim/Lighting.h"
+#include "sim/Props.h"
 #include "sim/Rng.h"
 #include "ui/Ui.h"
 #include "app/Capture.h"
@@ -171,6 +172,7 @@ int main(int argc, char* argv[]) {
     aq::BackgroundMode bg_mode = aq::BackgroundMode::BlueGradient;
     aq::Clock clock;
     aq::Lighting lighting;
+    aq::Props props;
 
     // Load saved settings (if any) and apply them before populating the tank,
     // so the fish count etc. are correct on the first frame.
@@ -301,6 +303,7 @@ int main(int argc, char* argv[]) {
         aquarium.update(dt, now_ticks - start_ticks);
         clock.update();
         lighting.update(dt, clock.hourOfDay());
+        props.update(dt);
 
         // Draw order: background, the big ASCII clock layer (behind the fish),
         // the live scene, the caustic light shafts, then the day/night ambient
@@ -308,6 +311,7 @@ int main(int argc, char* argv[]) {
         // HUD/Settings chrome on top at full brightness so they stay readable.
         background.draw(fb, bg_mode);
         clock.drawBackgroundLayer(fb);
+        props.draw(fb);
         aquarium.draw(fb);
         lighting.drawCaustics(fb);
         lighting.applyAmbient(fb);
