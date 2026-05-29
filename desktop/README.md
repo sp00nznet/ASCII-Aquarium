@@ -27,8 +27,8 @@ Early port, in progress. Currently:
 - ✅ On-screen clock: small text + big ASCII art, 12/24h, position, color,
   horizontal flip — driven by the OS system clock
 - ✅ Input: debounced taps from mouse **and** touchscreen, mapped to the canvas
-- ✅ HUD + tabbed Settings panel (Tank / Seaweed / Clock / Backgrd) with the
-  Clock style + color pop-overs, all wired to the live simulation
+- ✅ HUD + tabbed Settings panel (Tank / Weeds / Clock / Back / Scene) with the
+  Clock style + color pop-overs, all wired to the live simulation and persisted
 - ✅ Settings persistence (config file) — survives restarts
 - ✅ Screenshot + sequence capture (BMP, auto-encoded to mp4/gif if ffmpeg is
   on PATH) to disk
@@ -62,9 +62,11 @@ Settings persist across runs. Escape quits, F11 toggles fullscreen, **F2**
 saves a screenshot, **F3** records a frame sequence (encoded to mp4/gif on
 stop if ffmpeg is available).
 
-Extra keyboard shortcuts: `B` cycles background, `C` toggles the clock, `V` its
-style, `H` 12/24h, `M` flip; `N` day/night, `L` light rays; `K` crab, `J`
-jellyfish, `F4` shark; `I` burn-in drift, `A` background auto-cycle.
+The Settings panel's **Scene** tab toggles (and persists) day/night, light
+rays, props, burn-in protection, and background auto-cycle. The same toggles —
+plus a few extras — have keyboard shortcuts: `B` cycles background, `C` toggles
+the clock, `V` its style, `H` 12/24h, `M` flip; `N` day/night, `L` light rays;
+`K` crab, `J` jellyfish, `F4` shark; `I` burn-in drift, `A` auto-cycle.
 
 For running this unattended on a small display, see
 [`docs/KIOSK.md`](docs/KIOSK.md).
