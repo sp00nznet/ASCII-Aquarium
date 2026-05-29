@@ -51,7 +51,9 @@ build:linux:
   stage: build
   tags: [linux, debian, shell]
   script:
-    - cmake -S desktop -B build -DCMAKE_BUILD_TYPE=Release
+    # Require the runner's system SDL2 (apt install libsdl2-dev); fail fast with
+    # a clear message rather than hanging on a GitHub fetch if it's missing.
+    - cmake -S desktop -B build -DCMAKE_BUILD_TYPE=Release -DAQ_REQUIRE_SYSTEM_SDL2=ON
     - cmake --build build -j
     - ./build/ascii-aquarium --help        # smoke test: the binary loads & runs
     - mkdir -p releases/linux
@@ -86,6 +88,11 @@ build:macos:
   stage: build
   tags: [macos, darwin, shell]
   script:
+    # Homebrew's bin dir isn't on the gitlab-runner service account's
+    # non-interactive PATH by default, so cmake (brew install cmake) isn't
+    # found otherwise. Cover both Apple-Silicon and Intel Homebrew prefixes.
+    - export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+    - cmake --version
     - cmake -S desktop -B build -DCMAKE_BUILD_TYPE=Release -DAQ_BUNDLED_SDL2=ON
     - cmake --build build -j
     - mkdir -p releases/macos

@@ -23,6 +23,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # SDL2 exists — used by the CI release builds (Windows/macOS) to produce a
 # standalone binary with no SDL2 runtime dependency.
 option(AQ_BUNDLED_SDL2 "Fetch and statically build SDL2 instead of using a system install" OFF)
+# When ON, require a system SDL2 and error out if it's missing, instead of
+# silently fetching from GitHub. CI's Linux job sets this so a runner that's
+# missing libsdl2-dev fails fast with a clear message rather than hanging on a
+# network fetch it may not be able to reach.
+option(AQ_REQUIRE_SYSTEM_SDL2 "Require a system SDL2; do not fall back to fetching" OFF)
 
 function(aq_fetch_sdl2)
     message(STATUS "Fetching and statically building SDL2 from source")
@@ -33,6 +38,7 @@ function(aq_fetch_sdl2)
     set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
     FetchContent_Declare(SDL2
         URL https://github.com/libsdl-org/SDL/releases/download/release-2.32.4/SDL2-2.32.4.zip
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(SDL2)
 endfunction()
@@ -42,6 +48,12 @@ if(AQ_BUNDLED_SDL2)
 else()
     find_package(SDL2 QUIET)
     if(NOT SDL2_FOUND)
+        if(AQ_REQUIRE_SYSTEM_SDL2)
+            message(FATAL_ERROR
+                "System SDL2 not found. Install the development package "
+                "(Debian/Ubuntu: apt install libsdl2-dev) or configure with "
+                "-DAQ_BUNDLED_SDL2=ON to build SDL2 from source.")
+        endif()
         message(STATUS "System SDL2 not found — falling back to a bundled build")
         aq_fetch_sdl2()
     endif()
