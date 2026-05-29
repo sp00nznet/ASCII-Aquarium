@@ -30,8 +30,21 @@ Early port, in progress. Currently:
 - ✅ HUD + tabbed Settings panel (Tank / Seaweed / Clock / Backgrd) with the
   Clock style + color pop-overs, all wired to the live simulation
 - ✅ Settings persistence (config file) — survives restarts
-- ✅ Screenshot + sequence capture (BMP) to disk
+- ✅ Screenshot + sequence capture (BMP, auto-encoded to mp4/gif if ffmpeg is
+  on PATH) to disk
 - ✅ Kiosk autostart docs (see [`docs/KIOSK.md`](docs/KIOSK.md))
+
+Desktop extensions beyond the upstream sketch:
+
+- ✅ Day/night cycle — ambient tint/brightness follow the OS clock (dim blue
+  night, warm dawn/dusk, neutral day), plus drifting caustic light rays
+- ✅ Tank props — sandcastle, a bubbling treasure chest, coral and a rock
+- ✅ More creatures — a sand-scuttling crab, a drifting jellyfish, and a rare
+  shark fly-through that scatters the school
+- ✅ Fish hunger — fish fill up when fed, mellow when sated, and graze the
+  seaweed when starving
+- ✅ Kiosk care — burn-in protection (slow whole-frame drift) and an optional
+  background auto-cycle
 
 The desktop port deliberately drops the device's WiFi / NTP internet-time
 flow: a desktop already has a correct system clock, which the on-screen clock
@@ -46,9 +59,12 @@ Tap the top-left corner to reveal the HUD; the **S** button opens Settings
 (adjust fish/bubble counts, visitor frequency, seaweed, background, and the
 clock), and **R / H / O** respawn the school or summon a seahorse / octopus.
 Settings persist across runs. Escape quits, F11 toggles fullscreen, **F2**
-saves a screenshot, **F3** records a frame sequence. Temporary keyboard
-shortcuts also exist: `B` cycles background, `C` toggles the clock, `V` its
-style, `H` 12/24h, `M` flip.
+saves a screenshot, **F3** records a frame sequence (encoded to mp4/gif on
+stop if ffmpeg is available).
+
+Extra keyboard shortcuts: `B` cycles background, `C` toggles the clock, `V` its
+style, `H` 12/24h, `M` flip; `N` day/night, `L` light rays; `K` crab, `J`
+jellyfish, `F4` shark; `I` burn-in drift, `A` background auto-cycle.
 
 For running this unattended on a small display, see
 [`docs/KIOSK.md`](docs/KIOSK.md).
