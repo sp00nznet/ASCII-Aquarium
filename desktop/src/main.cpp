@@ -20,6 +20,7 @@
 #include "sim/Clock.h"
 #include "sim/Rng.h"
 #include "ui/Ui.h"
+#include "app/Capture.h"
 #include "app/Config.h"
 
 namespace {
@@ -32,6 +33,7 @@ struct Options {
     int scale = 2;
     bool fullscreen = false;
     bool hide_cursor = false;
+    std::string capture_dir;
 };
 
 void print_usage(const char* argv0) {
@@ -41,11 +43,14 @@ void print_usage(const char* argv0) {
         "  --scale N         integer scale factor for windowed mode (1..16, default 2)\n"
         "  --fullscreen      borderless fullscreen, content scaled to fit\n"
         "  --hide-cursor     hide the mouse cursor (kiosk mode)\n"
+        "  --capture-dir D   directory for screenshots/sequences (default: app data dir)\n"
         "  -h, --help        show this help and exit\n"
         "\n"
         "Runtime keys:\n"
         "  Escape            quit\n"
-        "  F11               toggle fullscreen\n",
+        "  F11               toggle fullscreen\n"
+        "  F2                save a screenshot\n"
+        "  F3                start/stop sequence recording\n",
         argv0);
 }
 
@@ -56,6 +61,12 @@ bool parse_args(int argc, char* argv[], Options& opts) {
             opts.fullscreen = true;
         } else if (std::strcmp(a, "--hide-cursor") == 0) {
             opts.hide_cursor = true;
+        } else if (std::strcmp(a, "--capture-dir") == 0) {
+            if (++i >= argc) {
+                std::fprintf(stderr, "--capture-dir requires a value\n");
+                return false;
+            }
+            opts.capture_dir = argv[i];
         } else if (std::strcmp(a, "--scale") == 0) {
             if (++i >= argc) {
                 std::fprintf(stderr, "--scale requires a value\n");
@@ -159,6 +170,12 @@ int main(int argc, char* argv[]) {
     aquarium.init();
 
     aq::ui::Ui ui(aquarium, background, clock, bg_mode);
+    aq::Capture capture(opts.capture_dir);
+
+    // Capture state: a pending single-shot flag and a transient on-screen toast.
+    bool screenshot_pending = false;
+    Uint32 toast_until_ticks = 0;
+    auto show_toast = [&](Uint32 now) { toast_until_ticks = now + 1800; };
 
     // Debounced settings autosave: save 1.2s after the last change (matching
     // the device), plus a final save on exit.
@@ -228,6 +245,11 @@ int main(int argc, char* argv[]) {
                         clock.setUse24Hour(!clock.use24Hour());
                     } else if (ev.key.keysym.sym == SDLK_m) {
                         clock.setFlipHorizontal(!clock.flipHorizontal());
+                    } else if (ev.key.keysym.sym == SDLK_F2) {
+                        screenshot_pending = true;  // serviced after the frame draws
+                    } else if (ev.key.keysym.sym == SDLK_F3) {
+                        capture.toggleSequence();
+                        show_toast(SDL_GetTicks());
                     }
                     break;
                 case SDL_MOUSEBUTTONDOWN:
@@ -279,6 +301,31 @@ int main(int argc, char* argv[]) {
         aquarium.draw(fb);
         clock.drawOverlay(fb);
         ui.draw(fb, fps);
+
+        // Capture the composited frame (before the capture indicator is drawn,
+        // so screenshots/recordings don't include the REC/toast overlay).
+        capture.recordFrame(fb);
+        if (screenshot_pending) {
+            screenshot_pending = false;
+            capture.saveScreenshot(fb);
+            show_toast(now_ticks);
+        }
+
+        // Capture indicator + transient toast (display only).
+        if (capture.sequenceActive()) {
+            char rec[24];
+            std::snprintf(rec, sizeof(rec), "REC %lu", capture.sequenceFrameCount());
+            fb.setTextFont(2);
+            fb.setTextDatum(TR_DATUM);
+            fb.setTextColor(TFT_RED);
+            fb.drawString(rec, kBackingWidth - 6, kBackingHeight - 18);
+        }
+        if (now_ticks < toast_until_ticks && !capture.lastStatus().empty()) {
+            fb.setTextFont(2);
+            fb.setTextDatum(BC_DATUM);
+            fb.setTextColor(TFT_WHITE, TFT_NAVY);
+            fb.drawString(capture.lastStatus().c_str(), kBackingWidth / 2, kBackingHeight - 4);
+        }
 
         SDL_UpdateTexture(texture, nullptr, fb.data(),
             static_cast<int>(fb.width() * sizeof(std::uint16_t)));
