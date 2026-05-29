@@ -7,6 +7,7 @@
 
 #include <SDL.h>
 
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -202,6 +203,14 @@ int main(int argc, char* argv[]) {
     Uint32 last_ticks = start_ticks;
     float fps = 0.0f;
 
+    // Kiosk extras: a slow whole-frame drift so static elements (clock/HUD)
+    // never burn into a 24/7 LCD, and an optional timer that rotates the
+    // background every few minutes for variety.
+    bool burnin_protect = true;
+    bool autocycle = false;
+    Uint32 autocycle_last = start_ticks;
+    constexpr Uint32 kAutocycleMs = 300000;  // 5 minutes
+
     // Tap pipeline: both mouse clicks and touchscreen taps funnel through here,
     // debounced like the device's TOUCH_DEBOUNCE_MS so a single touch (which SDL
     // also reports as a synthetic mouse click) only registers once.
@@ -265,6 +274,11 @@ int main(int argc, char* argv[]) {
                         aquarium.spawnJellyfishNow();
                     } else if (ev.key.keysym.sym == SDLK_F4) {
                         aquarium.spawnSharkNow();
+                    } else if (ev.key.keysym.sym == SDLK_i) {
+                        burnin_protect = !burnin_protect;
+                    } else if (ev.key.keysym.sym == SDLK_a) {
+                        autocycle = !autocycle;
+                        autocycle_last = SDL_GetTicks();
                     }
                     break;
                 case SDL_MOUSEBUTTONDOWN:
@@ -304,6 +318,12 @@ int main(int argc, char* argv[]) {
             if (cur != saved_settings && now_ticks - last_change_ticks >= 1200) {
                 if (aq::config::save(config_path, cur)) saved_settings = cur;
             }
+        }
+
+        if (autocycle && now_ticks - autocycle_last >= kAutocycleMs) {
+            autocycle_last = now_ticks;
+            bg_mode = static_cast<aq::BackgroundMode>(
+                (static_cast<int>(bg_mode) + 1) % static_cast<int>(aq::BackgroundMode::Count));
         }
 
         aquarium.update(dt, now_ticks - start_ticks);
@@ -353,7 +373,17 @@ int main(int argc, char* argv[]) {
             static_cast<int>(fb.width() * sizeof(std::uint16_t)));
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
-        SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+        // Burn-in protection: drift the whole image a few pixels on a slow
+        // Lissajous path so nothing static ever sits on the same LCD pixels.
+        if (burnin_protect) {
+            const float sec = (now_ticks - start_ticks) / 1000.0f;
+            const int dx = static_cast<int>(std::lround(3.0 * std::sin(6.28318 * sec / 97.0)));
+            const int dy = static_cast<int>(std::lround(3.0 * std::sin(6.28318 * sec / 131.0 + 1.3)));
+            SDL_Rect dst{dx, dy, kBackingWidth, kBackingHeight};
+            SDL_RenderCopy(renderer, texture, nullptr, &dst);
+        } else {
+            SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+        }
         SDL_RenderPresent(renderer);
     }
 
