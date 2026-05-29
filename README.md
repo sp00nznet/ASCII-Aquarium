@@ -26,8 +26,7 @@ screens too.
 
 ## Downloads
 
-Prebuilt **Linux / Windows / macOS** binaries — built by CI on every push to
-`main` — are at **<https://sp00.nz/releases/ASCII-Aquarium/>** (grab the `main/`
+Prebuilt **Linux / Windows / macOS** binaries are at **<https://sp00.nz/releases/ASCII-Aquarium/>** (grab the `main/`
 folder, or a tagged release). Or build from source — see
 [`desktop/README.md`](desktop/README.md).
 
@@ -83,10 +82,7 @@ behavioral spec:
 
 - One-command CMake build: Linux uses the system SDL2; Windows/macOS fetch and
   static-link SDL2 into a standalone binary (no vcpkg, no loose DLLs).
-- A **GitLab CI/CD pipeline** (Linux / Windows / macOS shell runners) that
-  builds all three and drops the binaries on a release share.
-- Kiosk autostart docs (systemd user unit / `cage` on Linux; Startup folder /
-  Task Scheduler on Windows).
+
 
 ## What this fork does differently from upstream
 
@@ -103,7 +99,7 @@ behavioral spec:
 
 ## Status
 
-Feature-complete and cross-platform (Linux / Windows / macOS), built in CI.
+Feature-complete and cross-platform (Linux / Windows / macOS)
 See [`desktop/README.md`](desktop/README.md) for build/run instructions, the
 full keyboard-shortcut list, and [`desktop/docs/KIOSK.md`](desktop/docs/KIOSK.md)
 for unattended/kiosk setup.
