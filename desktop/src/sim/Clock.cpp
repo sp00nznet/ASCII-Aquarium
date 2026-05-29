@@ -28,6 +28,17 @@ constexpr std::uint16_t kClockFlipTransparent = 0x0801;  // key colour outside t
 const std::uint16_t kDefaultSmallClockColor = TFT_WHITE;
 const std::uint16_t kDefaultAsciiClockColor = RGB565(0, 20, 95);
 
+// Selectable clock text colors (upstream kClockColorPalette).
+const std::uint16_t kClockColorPalette[] = {
+    kDefaultAsciiClockColor, TFT_WHITE, TFT_LIGHTGREY, TFT_DARKGREY,
+    RGB565(255, 40, 40),   RGB565(255, 128, 20), RGB565(255, 220, 40), RGB565(160, 255, 40),
+    RGB565(40, 220, 80),   RGB565(0, 180, 120),  RGB565(0, 220, 220),  RGB565(80, 180, 255),
+    RGB565(40, 80, 255),   RGB565(120, 80, 255), RGB565(220, 60, 255), RGB565(255, 120, 200),
+    RGB565(100, 0, 0),     RGB565(130, 56, 0),   RGB565(116, 108, 18), RGB565(0, 82, 30),
+    RGB565(0, 76, 76),     RGB565(0, 0, 156),    RGB565(58, 20, 120),  RGB565(156, 120, 255)};
+constexpr int kClockColorCount =
+    static_cast<int>(sizeof(kClockColorPalette) / sizeof(kClockColorPalette[0]));
+
 template <typename T>
 T clampVal(T v, T lo, T hi) {
     return (v < lo) ? lo : ((v > hi) ? hi : v);
@@ -131,6 +142,13 @@ void mirrorClockTextInPlace(char* text) {
 }
 
 }  // namespace
+
+int Clock::paletteCount() { return kClockColorCount; }
+
+std::uint16_t Clock::paletteColor(int i) {
+    if (i < 0 || i >= kClockColorCount) return kDefaultSmallClockColor;
+    return kClockColorPalette[i];
+}
 
 Clock::Clock()
     : smallTextColor_(kDefaultSmallClockColor),

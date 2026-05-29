@@ -100,12 +100,35 @@ public:
     // Drop a food flake at (x, y) — wired to taps/clicks for feeding.
     void spawnFlake(float x, float y);
 
-    // ---- Settings hooks (used later by the Settings panel) ----
+    // ---- Settings hooks (used by the Settings panel) ----
     void setFishTarget(int n);
     void setBubbleTarget(int n);
     void setSeaweedSway(float s)        { seaweedSwaySpeed_ = s; }
     void setSeaweedLength(float l)      { seaweedLength_ = l; }
     void setSeaweedRandomness(float r)  { seaweedLengthRandomness_ = r; }
+
+    // Current control values (for display in the Settings panel).
+    int   fishTarget() const         { return fishTargetCount_; }
+    int   bubbleTarget() const       { return bubbleTargetCount_; }
+    int   octopusFrequency() const   { return octopusFrequency_; }
+    int   seahorseFrequency() const  { return seahorseFrequency_; }
+    float seaweedSway() const        { return seaweedSwaySpeed_; }
+    float seaweedLength() const      { return seaweedLength_; }
+    float seaweedRandomness() const  { return seaweedLengthRandomness_; }
+
+    // Settings-panel mutators (each clamps to the upstream min/max).
+    void nudgeFish(int delta);
+    void nudgeBubbles(int delta);
+    void cycleOctopusFrequency(int delta);
+    void cycleSeahorseFrequency(int delta);
+    void nudgeSeaweedSway(float delta);
+    void nudgeSeaweedLength(float delta);
+    void nudgeSeaweedRandomness(float delta);
+
+    // HUD action buttons: re-roll the school, or summon a visitor at center.
+    void respawn() { respawnFishPopulation(); }
+    void spawnOctopusAtCenter();
+    void spawnSeahorseAtCenter();
 
 private:
     // --- population management ---

@@ -1,6 +1,7 @@
 #include "sim/Aquarium.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 #include "renderer/Color.h"
@@ -22,6 +23,12 @@ constexpr int   kDefaultSeahorseFrequency = 1;
 constexpr float kDefaultSway = 1.10f;
 constexpr float kDefaultSeaweedLength = 1.35f;
 constexpr float kDefaultSeaweedLengthRandomness = 0.35f;
+constexpr float kMinSway = 0.25f;
+constexpr float kMaxSway = 2.5f;
+constexpr float kMinSeaweedLength = 0.80f;
+constexpr float kMaxSeaweedLength = 1.60f;
+constexpr float kMinSeaweedRandomness = 0.00f;
+constexpr float kMaxSeaweedRandomness = 0.50f;
 
 constexpr float kFishSwimWaveAmplitude = 1.5f;
 constexpr float kFishSwimWaveSpeed = 5.6f;
@@ -57,6 +64,23 @@ constexpr float kTwoPi = 6.28318f;
 template <typename T>
 T clampVal(T v, T lo, T hi) {
     return (v < lo) ? lo : ((v > hi) ? hi : v);
+}
+
+// Visitor spawn frequency options (per hour) and nearest-match normalization.
+const int kOctopusFreqOptions[] = {1, 2, 4, 6, 12, 60};
+const int kSeahorseFreqOptions[] = {1, 2, 4, 6, 12, 60};
+
+int normalizeFrequency(int value, const int* opts, int count) {
+    int best = opts[0];
+    int bestDiff = std::abs(value - best);
+    for (int i = 1; i < count; ++i) {
+        int diff = std::abs(value - opts[i]);
+        if (diff < bestDiff) {
+            best = opts[i];
+            bestDiff = diff;
+        }
+    }
+    return best;
 }
 
 struct FishSpecies {
@@ -383,6 +407,55 @@ void Aquarium::setBubbleTarget(int n) {
     applyBubblePopulation(false);
 }
 
+void Aquarium::nudgeFish(int delta) {
+    fishTargetCount_ = clampVal(fishTargetCount_ + delta, kMinFish, kMaxFish);
+    applyFishPopulation();
+}
+
+void Aquarium::nudgeBubbles(int delta) {
+    bubbleTargetCount_ = clampVal(bubbleTargetCount_ + delta, kMinBubbles, kMaxBubbles);
+    applyBubblePopulation(false);
+}
+
+void Aquarium::cycleOctopusFrequency(int delta) {
+    int current = normalizeFrequency(octopusFrequency_, kOctopusFreqOptions, 6);
+    int index = 0;
+    for (int i = 0; i < 6; ++i) {
+        if (kOctopusFreqOptions[i] == current) { index = i; break; }
+    }
+    index += delta;
+    if (index < 0) index = 5;
+    if (index >= 6) index = 0;
+    octopusFrequency_ = kOctopusFreqOptions[index];
+    if (!octopus_.active) octopus_.nextSpawnMs = 0;
+}
+
+void Aquarium::cycleSeahorseFrequency(int delta) {
+    int current = normalizeFrequency(seahorseFrequency_, kSeahorseFreqOptions, 6);
+    int index = 0;
+    for (int i = 0; i < 6; ++i) {
+        if (kSeahorseFreqOptions[i] == current) { index = i; break; }
+    }
+    index += delta;
+    if (index < 0) index = 5;
+    if (index >= 6) index = 0;
+    seahorseFrequency_ = kSeahorseFreqOptions[index];
+    if (!seahorse_.active) seahorse_.nextSpawnMs = 0;
+}
+
+void Aquarium::nudgeSeaweedSway(float delta) {
+    seaweedSwaySpeed_ = clampVal(seaweedSwaySpeed_ + delta, kMinSway, kMaxSway);
+}
+
+void Aquarium::nudgeSeaweedLength(float delta) {
+    seaweedLength_ = clampVal(seaweedLength_ + delta, kMinSeaweedLength, kMaxSeaweedLength);
+}
+
+void Aquarium::nudgeSeaweedRandomness(float delta) {
+    seaweedLengthRandomness_ =
+        clampVal(seaweedLengthRandomness_ + delta, kMinSeaweedRandomness, kMaxSeaweedRandomness);
+}
+
 // ---------------------------- init -----------------------------------------
 
 void Aquarium::init() {
@@ -656,21 +729,6 @@ namespace {
 bool timeReached(unsigned long now, unsigned long target) {
     return static_cast<long>(now - target) >= 0;
 }
-const int kOctopusFreqOptions[] = {1, 2, 4, 6, 12, 60};
-const int kSeahorseFreqOptions[] = {1, 2, 4, 6, 12, 60};
-
-int normalizeFrequency(int value, const int* opts, int count) {
-    int best = opts[0];
-    int bestDiff = std::abs(value - best);
-    for (int i = 1; i < count; ++i) {
-        int diff = std::abs(value - opts[i]);
-        if (diff < bestDiff) {
-            best = opts[i];
-            bestDiff = diff;
-        }
-    }
-    return best;
-}
 }  // namespace
 
 unsigned long Aquarium::octopusSpawnIntervalMs() const {
@@ -697,6 +755,17 @@ void Aquarium::spawnOctopus(unsigned long now) {
     octopus_.phase = rng_.frand(0.0f, kTwoPi);
     octopus_.colorPhase = rng_.frand(0.0f, kTwoPi);
     scheduleOctopusSpawn(now);
+}
+
+void Aquarium::spawnOctopusAtCenter() {
+    octopus_.active = true;
+    octopus_.x = kScreenW * 0.5f;
+    octopus_.baseY = kSeaLevelY * 0.55f;
+    octopus_.y = octopus_.baseY;
+    octopus_.vx = (rng_.random(100) < 50) ? -rng_.frand(3.8f, 6.5f) : rng_.frand(3.8f, 6.5f);
+    octopus_.phase = rng_.frand(0.0f, kTwoPi);
+    octopus_.colorPhase = rng_.frand(0.0f, kTwoPi);
+    scheduleOctopusSpawn(nowMs_);
 }
 
 void Aquarium::updateOctopus(unsigned long now, float dt) {
@@ -733,6 +802,19 @@ void Aquarium::spawnSeahorse(unsigned long now) {
     seahorse_.phase = rng_.frand(0.0f, kTwoPi);
     seahorse_.finPhase = rng_.frand(0.0f, kTwoPi);
     scheduleSeahorseSpawn(now);
+}
+
+void Aquarium::spawnSeahorseAtCenter() {
+    seahorse_.active = true;
+    seahorse_.facingRight = (rng_.random(100) < 50);
+    seahorse_.x = kScreenW * 0.5f - 16.0f;
+    seahorse_.baseY = kSeaLevelY * 0.46f;
+    seahorse_.y = seahorse_.baseY;
+    seahorse_.vx = seahorse_.facingRight ? rng_.frand(1.4f, 2.4f) * kSeahorseSpeedBoost
+                                         : -rng_.frand(1.4f, 2.4f) * kSeahorseSpeedBoost;
+    seahorse_.phase = rng_.frand(0.0f, kTwoPi);
+    seahorse_.finPhase = rng_.frand(0.0f, kTwoPi);
+    scheduleSeahorseSpawn(nowMs_);
 }
 
 void Aquarium::updateSeahorse(unsigned long now, float dt) {

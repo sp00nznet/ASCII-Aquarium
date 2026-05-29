@@ -18,7 +18,7 @@
 #include "sim/Background.h"
 #include "sim/Clock.h"
 #include "sim/Rng.h"
-#include "ui/Hit.h"
+#include "ui/Ui.h"
 
 namespace {
 
@@ -152,11 +152,13 @@ int main(int argc, char* argv[]) {
     aq::BackgroundMode bg_mode = aq::BackgroundMode::BlueGradient;
 
     aq::Clock clock;
+    aq::ui::Ui ui(aquarium, background, clock, bg_mode);
 
     // Animation clock: monotonic ms since the loop started, so the simulation's
     // time base is independent of how long setup took.
     const Uint32 start_ticks = SDL_GetTicks();
     Uint32 last_ticks = start_ticks;
+    float fps = 0.0f;
 
     // Tap pipeline: both mouse clicks and touchscreen taps funnel through here,
     // debounced like the device's TOUCH_DEBOUNCE_MS so a single touch (which SDL
@@ -169,8 +171,9 @@ int main(int argc, char* argv[]) {
         last_tap_ticks = t;
         const int x = static_cast<int>(lx);
         const int y = static_cast<int>(ly);
-        // Task #8 will route the tap to the HUD/Settings panels first (via
-        // ui::inside hit-tests) and only feed when it lands in open water.
+        // The UI gets first crack at the tap (HUD/Settings hit-tests). Only a
+        // tap that lands in open water falls through to feeding the fish.
+        if (ui.handleTap(x, y)) return;
         aquarium.spawnFlake(static_cast<float>(x), static_cast<float>(y));
     };
     // Convert a point in window pixels to the 320x240 logical canvas, honoring
@@ -238,16 +241,19 @@ int main(int argc, char* argv[]) {
         last_ticks = now_ticks;
         // Clamp dt so a stall (window drag, breakpoint) can't teleport entities.
         if (dt > 0.1f) dt = 0.1f;
+        if (dt > 0.0f) fps = fps * 0.9f + (1.0f / dt) * 0.1f;  // smoothed
 
         aquarium.update(dt, now_ticks - start_ticks);
         clock.update();
 
         // Draw order mirrors the sketch: background, the big ASCII clock layer
-        // (behind the fish), the live scene, then the small clock overlay.
+        // (behind the fish), the live scene, the small clock overlay, then the
+        // HUD/Settings chrome on top.
         background.draw(fb, bg_mode);
         clock.drawBackgroundLayer(fb);
         aquarium.draw(fb);
         clock.drawOverlay(fb);
+        ui.draw(fb, fps);
 
         SDL_UpdateTexture(texture, nullptr, fb.data(),
             static_cast<int>(fb.width() * sizeof(std::uint16_t)));

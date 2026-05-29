@@ -57,6 +57,10 @@ public:
         if (style_ == ClockStyle::Ascii) asciiTextColor_ = c; else smallTextColor_ = c;
     }
 
+    // Selectable text-color palette (for the Settings color picker grid).
+    static int paletteCount();
+    static std::uint16_t paletteColor(int i);
+
 private:
     void formatClockDisplay(char* out, std::size_t outCap) const;
     void formatClockTimeOnly(char* out, std::size_t outCap, bool includeMeridiem) const;
