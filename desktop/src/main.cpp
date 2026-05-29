@@ -175,15 +175,20 @@ int main(int argc, char* argv[]) {
     aq::Lighting lighting;
     aq::Props props;
 
+    // Kiosk toggles (persisted alongside the rest): burn-in drift + auto-cycle.
+    bool burnin_protect = true;
+    bool autocycle = false;
+
     // Load saved settings (if any) and apply them before populating the tank,
     // so the fish count etc. are correct on the first frame.
     const std::string config_path = aq::config::filePath();
-    aq::config::Settings settings = aq::config::snapshot(aquarium, clock, bg_mode);
+    aq::config::Settings settings =
+        aq::config::snapshot(aquarium, clock, bg_mode, lighting, props, burnin_protect, autocycle);
     aq::config::load(config_path, settings);
-    aq::config::apply(settings, aquarium, clock, bg_mode);
+    aq::config::apply(settings, aquarium, clock, bg_mode, lighting, props, burnin_protect, autocycle);
     aquarium.init();
 
-    aq::ui::Ui ui(aquarium, background, clock, bg_mode);
+    aq::ui::Ui ui(aquarium, background, clock, bg_mode, lighting, props, burnin_protect, autocycle);
     aq::Capture capture(opts.capture_dir);
 
     // Capture state: a pending single-shot flag and a transient on-screen toast.
@@ -193,7 +198,8 @@ int main(int argc, char* argv[]) {
 
     // Debounced settings autosave: save 1.2s after the last change (matching
     // the device), plus a final save on exit.
-    aq::config::Settings saved_settings = aq::config::snapshot(aquarium, clock, bg_mode);
+    aq::config::Settings saved_settings =
+        aq::config::snapshot(aquarium, clock, bg_mode, lighting, props, burnin_protect, autocycle);
     aq::config::Settings prev_settings = saved_settings;
     Uint32 last_change_ticks = 0;
 
@@ -203,11 +209,8 @@ int main(int argc, char* argv[]) {
     Uint32 last_ticks = start_ticks;
     float fps = 0.0f;
 
-    // Kiosk extras: a slow whole-frame drift so static elements (clock/HUD)
-    // never burn into a 24/7 LCD, and an optional timer that rotates the
-    // background every few minutes for variety.
-    bool burnin_protect = true;
-    bool autocycle = false;
+    // Burn-in drift + auto-cycle are toggled via the Scene settings tab (and
+    // the I / A debug keys); the timer state lives here.
     Uint32 autocycle_last = start_ticks;
     constexpr Uint32 kAutocycleMs = 300000;  // 5 minutes
 
@@ -310,7 +313,8 @@ int main(int argc, char* argv[]) {
         // Debounced settings autosave: reset the timer whenever a setting
         // changes, and write once it has been stable for 1.2s.
         {
-            aq::config::Settings cur = aq::config::snapshot(aquarium, clock, bg_mode);
+            aq::config::Settings cur = aq::config::snapshot(
+                aquarium, clock, bg_mode, lighting, props, burnin_protect, autocycle);
             if (cur != prev_settings) {
                 last_change_ticks = now_ticks;
                 prev_settings = cur;
@@ -389,7 +393,8 @@ int main(int argc, char* argv[]) {
 
     // Flush any unsaved settings on exit.
     {
-        aq::config::Settings cur = aq::config::snapshot(aquarium, clock, bg_mode);
+        aq::config::Settings cur = aq::config::snapshot(
+            aquarium, clock, bg_mode, lighting, props, burnin_protect, autocycle);
         if (cur != saved_settings) aq::config::save(config_path, cur);
     }
 

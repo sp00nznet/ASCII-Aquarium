@@ -9,6 +9,8 @@
 #include "sim/Aquarium.h"
 #include "sim/Background.h"
 #include "sim/Clock.h"
+#include "sim/Lighting.h"
+#include "sim/Props.h"
 
 namespace fs = std::filesystem;
 
@@ -21,7 +23,9 @@ bool Settings::operator==(const Settings& o) const {
            randomness == o.randomness && bgMode == o.bgMode && clockOn == o.clockOn &&
            clock24h == o.clock24h && clockFlip == o.clockFlip && clockStyle == o.clockStyle &&
            clockPos == o.clockPos && clockSmallColor == o.clockSmallColor &&
-           clockAsciiColor == o.clockAsciiColor;
+           clockAsciiColor == o.clockAsciiColor && dayNight == o.dayNight &&
+           caustics == o.caustics && props == o.props && burnin == o.burnin &&
+           autocycle == o.autocycle;
 }
 
 namespace {
@@ -75,6 +79,11 @@ bool load(const std::string& path, Settings& out) {
                 out.clockSmallColor = static_cast<std::uint16_t>(std::stoul(val));
             else if (key == "clock_ascii_color")
                 out.clockAsciiColor = static_cast<std::uint16_t>(std::stoul(val));
+            else if (key == "day_night") out.dayNight = (std::stoi(val) != 0);
+            else if (key == "caustics") out.caustics = (std::stoi(val) != 0);
+            else if (key == "props") out.props = (std::stoi(val) != 0);
+            else if (key == "burnin") out.burnin = (std::stoi(val) != 0);
+            else if (key == "autocycle") out.autocycle = (std::stoi(val) != 0);
         } catch (...) {
             // Skip malformed values, keep the existing default.
         }
@@ -103,10 +112,16 @@ bool save(const std::string& path, const Settings& s) {
     out << "clock_pos=" << s.clockPos << "\n";
     out << "clock_small_color=" << static_cast<unsigned>(s.clockSmallColor) << "\n";
     out << "clock_ascii_color=" << static_cast<unsigned>(s.clockAsciiColor) << "\n";
+    out << "day_night=" << (s.dayNight ? 1 : 0) << "\n";
+    out << "caustics=" << (s.caustics ? 1 : 0) << "\n";
+    out << "props=" << (s.props ? 1 : 0) << "\n";
+    out << "burnin=" << (s.burnin ? 1 : 0) << "\n";
+    out << "autocycle=" << (s.autocycle ? 1 : 0) << "\n";
     return static_cast<bool>(out);
 }
 
-Settings snapshot(const Aquarium& aquarium, const Clock& clock, BackgroundMode bgMode) {
+Settings snapshot(const Aquarium& aquarium, const Clock& clock, BackgroundMode bgMode,
+                  const Lighting& lighting, const Props& props, bool burnin, bool autocycle) {
     Settings s;
     s.fish = aquarium.fishTarget();
     s.bubbles = aquarium.bubbleTarget();
@@ -123,10 +138,16 @@ Settings snapshot(const Aquarium& aquarium, const Clock& clock, BackgroundMode b
     s.clockPos = static_cast<int>(clock.smallPosition());
     s.clockSmallColor = clock.smallTextColor();
     s.clockAsciiColor = clock.asciiTextColor();
+    s.dayNight = lighting.dayNight();
+    s.caustics = lighting.caustics();
+    s.props = props.enabled();
+    s.burnin = burnin;
+    s.autocycle = autocycle;
     return s;
 }
 
-void apply(const Settings& s, Aquarium& aquarium, Clock& clock, BackgroundMode& bgMode) {
+void apply(const Settings& s, Aquarium& aquarium, Clock& clock, BackgroundMode& bgMode,
+           Lighting& lighting, Props& props, bool& burnin, bool& autocycle) {
     aquarium.setFishTarget(s.fish);
     aquarium.setBubbleTarget(s.bubbles);
     aquarium.setOctopusFrequency(s.octopusFreq);
@@ -150,6 +171,12 @@ void apply(const Settings& s, Aquarium& aquarium, Clock& clock, BackgroundMode& 
     clock.setSmallPosition(static_cast<ClockSmallPosition>(pos));
     clock.setSmallTextColor(s.clockSmallColor);
     clock.setAsciiTextColor(s.clockAsciiColor);
+
+    lighting.setDayNight(s.dayNight);
+    lighting.setCaustics(s.caustics);
+    props.setEnabled(s.props);
+    burnin = s.burnin;
+    autocycle = s.autocycle;
 }
 
 }  // namespace config

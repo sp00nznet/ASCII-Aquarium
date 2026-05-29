@@ -15,6 +15,8 @@ namespace aq {
 
 class Aquarium;
 class Clock;
+class Lighting;
+class Props;
 enum class BackgroundMode : int;
 
 namespace config {
@@ -35,6 +37,12 @@ struct Settings {
     int   clockPos = 0;    // ClockSmallPosition::Top
     std::uint16_t clockSmallColor = 0xFFFF;
     std::uint16_t clockAsciiColor = 0x008B;  // RGB565(0,20,95)
+    // Scene toggles (desktop extensions).
+    bool  dayNight = true;
+    bool  caustics = true;
+    bool  props = true;
+    bool  burnin = true;
+    bool  autocycle = false;
 
     bool operator==(const Settings& o) const;
     bool operator!=(const Settings& o) const { return !(*this == o); }
@@ -51,8 +59,10 @@ bool load(const std::string& path, Settings& out);
 bool save(const std::string& path, const Settings& s);
 
 // Snapshot the current live settings / push settings into the live objects.
-Settings snapshot(const Aquarium& aquarium, const Clock& clock, BackgroundMode bgMode);
-void apply(const Settings& s, Aquarium& aquarium, Clock& clock, BackgroundMode& bgMode);
+Settings snapshot(const Aquarium& aquarium, const Clock& clock, BackgroundMode bgMode,
+                  const Lighting& lighting, const Props& props, bool burnin, bool autocycle);
+void apply(const Settings& s, Aquarium& aquarium, Clock& clock, BackgroundMode& bgMode,
+           Lighting& lighting, Props& props, bool& burnin, bool& autocycle);
 
 }  // namespace config
 }  // namespace aq

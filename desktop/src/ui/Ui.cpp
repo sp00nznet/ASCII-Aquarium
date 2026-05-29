@@ -7,6 +7,8 @@
 #include "renderer/Framebuffer.h"
 #include "sim/Aquarium.h"
 #include "sim/Clock.h"
+#include "sim/Lighting.h"
+#include "sim/Props.h"
 #include "ui/Hit.h"
 
 namespace aq {
@@ -25,12 +27,17 @@ constexpr int BTN_W = 30, BTN_H = 24;
 constexpr int ACTION_X = PANEL_X + 134, ACTION_W = 98;
 constexpr int ROW_START_Y = PANEL_Y + 36, ROW_GAP = 34;
 constexpr int TAB_Y = PANEL_Y + PANEL_H - 30, TAB_H = 22, TAB_GAP = 4;
-constexpr int TANK_TAB_X = PANEL_X + 5, TANK_TAB_W = 48;
-constexpr int SEAWEED_TAB_X = TANK_TAB_X + TANK_TAB_W + TAB_GAP, SEAWEED_TAB_W = 62;
-constexpr int CLOCK_TAB_X = SEAWEED_TAB_X + SEAWEED_TAB_W + TAB_GAP, CLOCK_TAB_W = 50;
-constexpr int BG_TAB_X = CLOCK_TAB_X + CLOCK_TAB_W + TAB_GAP, BG_TAB_W = 58;
+// Five equal tabs across the panel; labels kept short to fit.
+constexpr int TAB_W = 42;
+constexpr int TANK_TAB_X = PANEL_X + 5;
+constexpr int SEAWEED_TAB_X = TANK_TAB_X + TAB_W + TAB_GAP;
+constexpr int CLOCK_TAB_X = SEAWEED_TAB_X + TAB_W + TAB_GAP;
+constexpr int BG_TAB_X = CLOCK_TAB_X + TAB_W + TAB_GAP;
+constexpr int SCENE_TAB_X = BG_TAB_X + TAB_W + TAB_GAP;
 
 constexpr int CLOCK_ROW_1_Y = PANEL_Y + 36, CLOCK_ROW_2_Y = PANEL_Y + 60;
+// Scene tab uses 5 rows with a tighter gap to fit above the tab bar.
+constexpr int SCENE_ROW_Y = PANEL_Y + 34, SCENE_ROW_GAP = 30;
 constexpr int CLOCK_STYLE_BUTTON_X = PANEL_X + 92, CLOCK_STYLE_BUTTON_W = 66;
 
 // ---- Clock style pop-over ----
@@ -123,8 +130,10 @@ const char* backgroundModeName(BackgroundMode mode) {
 
 }  // namespace
 
-Ui::Ui(Aquarium& aquarium, Background& background, Clock& clock, BackgroundMode& bgMode)
-    : aquarium_(aquarium), background_(background), clock_(clock), bgMode_(bgMode) {}
+Ui::Ui(Aquarium& aquarium, Background& background, Clock& clock, BackgroundMode& bgMode,
+       Lighting& lighting, Props& props, bool& burnin, bool& autocycle)
+    : aquarium_(aquarium), background_(background), clock_(clock), bgMode_(bgMode),
+      lighting_(lighting), props_(props), burnin_(burnin), autocycle_(autocycle) {}
 
 // ------------------------------ drawing ------------------------------------
 
@@ -195,26 +204,44 @@ void Ui::drawSettingsPanel(Framebuffer& fb) {
         drawSettingRow(fb, ROW_START_Y + ROW_GAP * 2, "Length Rand", buf);
     } else if (activeTab_ == SettingsTab::Clock) {
         drawClockSettings(fb);
-    } else {
+    } else if (activeTab_ == SettingsTab::Background) {
         drawSettingRow(fb, ROW_START_Y, "Style", backgroundModeName(bgMode_));
         if (bgMode_ == BackgroundMode::Flowers) {
             drawActionRow(fb, ROW_START_Y + ROW_GAP, "Flowers", "Randomize");
         }
+    } else {
+        drawSceneSettings(fb);
     }
 
     drawButton(fb, CLOSE_X, CLOSE_Y, CLOSE_W, CLOSE_H, "X", TFT_WHITE, TFT_RED);
 
-    // Tabs.
-    const bool tank = activeTab_ == SettingsTab::Tank, sea = activeTab_ == SettingsTab::Seaweed;
-    const bool clk = activeTab_ == SettingsTab::Clock, bg = activeTab_ == SettingsTab::Background;
-    drawButton(fb, TANK_TAB_X, TAB_Y, TANK_TAB_W, TAB_H, "Tank",
-               tank ? TFT_NAVY : TFT_CYAN, tank ? TFT_CYAN : TFT_DARKGREEN);
-    drawButton(fb, SEAWEED_TAB_X, TAB_Y, SEAWEED_TAB_W, TAB_H, "Seaweed",
-               sea ? TFT_NAVY : TFT_CYAN, sea ? TFT_CYAN : TFT_DARKGREEN);
-    drawButton(fb, CLOCK_TAB_X, TAB_Y, CLOCK_TAB_W, TAB_H, "Clock",
-               clk ? TFT_NAVY : TFT_CYAN, clk ? TFT_CYAN : TFT_DARKGREEN);
-    drawButton(fb, BG_TAB_X, TAB_Y, BG_TAB_W, TAB_H, "Backgrd",
-               bg ? TFT_NAVY : TFT_CYAN, bg ? TFT_CYAN : TFT_DARKGREEN);
+    // Tabs (five equal cells; short labels).
+    struct TabDef { int x; const char* label; SettingsTab tab; };
+    const TabDef tabs[] = {
+        {TANK_TAB_X, "Tank", SettingsTab::Tank},
+        {SEAWEED_TAB_X, "Weeds", SettingsTab::Seaweed},
+        {CLOCK_TAB_X, "Clock", SettingsTab::Clock},
+        {BG_TAB_X, "Back", SettingsTab::Background},
+        {SCENE_TAB_X, "Scene", SettingsTab::Scene},
+    };
+    for (const auto& t : tabs) {
+        const bool active = (activeTab_ == t.tab);
+        drawButton(fb, t.x, TAB_Y, TAB_W, TAB_H, t.label,
+                   active ? TFT_NAVY : TFT_CYAN, active ? TFT_CYAN : TFT_DARKGREEN);
+    }
+}
+
+void Ui::drawSceneSettings(Framebuffer& fb) {
+    drawToggleRow(fb, SCENE_ROW_Y, "Day/Night", "Off", "On",
+                  !lighting_.dayNight(), lighting_.dayNight());
+    drawToggleRow(fb, SCENE_ROW_Y + SCENE_ROW_GAP, "Light Rays", "Off", "On",
+                  !lighting_.caustics(), lighting_.caustics());
+    drawToggleRow(fb, SCENE_ROW_Y + SCENE_ROW_GAP * 2, "Props", "Off", "On",
+                  !props_.enabled(), props_.enabled());
+    drawToggleRow(fb, SCENE_ROW_Y + SCENE_ROW_GAP * 3, "Anti Burn-in", "Off", "On",
+                  !burnin_, burnin_);
+    drawToggleRow(fb, SCENE_ROW_Y + SCENE_ROW_GAP * 4, "Auto Cycle", "Off", "On",
+                  !autocycle_, autocycle_);
 }
 
 void Ui::drawClockStylePanel(Framebuffer& fb) {
@@ -386,17 +413,20 @@ bool Ui::handleSettingsTap(int x, int y) {
         return true;
     }
     // Tabs.
-    if (inside(x, y, TANK_TAB_X, TAB_Y, TANK_TAB_W, TAB_H)) {
+    if (inside(x, y, TANK_TAB_X, TAB_Y, TAB_W, TAB_H)) {
         activeTab_ = SettingsTab::Tank; clockStylePanelOpen_ = clockColorPanelOpen_ = false; return true;
     }
-    if (inside(x, y, SEAWEED_TAB_X, TAB_Y, SEAWEED_TAB_W, TAB_H)) {
+    if (inside(x, y, SEAWEED_TAB_X, TAB_Y, TAB_W, TAB_H)) {
         activeTab_ = SettingsTab::Seaweed; clockStylePanelOpen_ = clockColorPanelOpen_ = false; return true;
     }
-    if (inside(x, y, CLOCK_TAB_X, TAB_Y, CLOCK_TAB_W, TAB_H)) {
+    if (inside(x, y, CLOCK_TAB_X, TAB_Y, TAB_W, TAB_H)) {
         activeTab_ = SettingsTab::Clock; return true;
     }
-    if (inside(x, y, BG_TAB_X, TAB_Y, BG_TAB_W, TAB_H)) {
+    if (inside(x, y, BG_TAB_X, TAB_Y, TAB_W, TAB_H)) {
         activeTab_ = SettingsTab::Background; clockStylePanelOpen_ = clockColorPanelOpen_ = false; return true;
+    }
+    if (inside(x, y, SCENE_TAB_X, TAB_Y, TAB_W, TAB_H)) {
+        activeTab_ = SettingsTab::Scene; clockStylePanelOpen_ = clockColorPanelOpen_ = false; return true;
     }
 
     if (activeTab_ == SettingsTab::Tank) {
@@ -423,7 +453,7 @@ bool Ui::handleSettingsTap(int x, int y) {
         if (inside(x, y, PLUS_X, CLOCK_ROW_1_Y, BTN_W, BTN_H))  { clock_.setVisible(true);  return true; }
         if (inside(x, y, MINUS_X, CLOCK_ROW_2_Y, BTN_W, BTN_H)) { clock_.setUse24Hour(false); return true; }
         if (inside(x, y, PLUS_X, CLOCK_ROW_2_Y, BTN_W, BTN_H))  { clock_.setUse24Hour(true);  return true; }
-    } else {  // Background
+    } else if (activeTab_ == SettingsTab::Background) {
         if (inside(x, y, MINUS_X, ROW_START_Y, BTN_W, BTN_H)) {
             int n = (static_cast<int>(bgMode_) - 1 + static_cast<int>(BackgroundMode::Count)) %
                     static_cast<int>(BackgroundMode::Count);
@@ -440,6 +470,20 @@ bool Ui::handleSettingsTap(int x, int y) {
             background_.randomizeFlowers();
             return true;
         }
+    } else {  // Scene — Off/On toggle rows
+        const int r0 = SCENE_ROW_Y, r1 = SCENE_ROW_Y + SCENE_ROW_GAP,
+                  r2 = SCENE_ROW_Y + SCENE_ROW_GAP * 2, r3 = SCENE_ROW_Y + SCENE_ROW_GAP * 3,
+                  r4 = SCENE_ROW_Y + SCENE_ROW_GAP * 4;
+        if (inside(x, y, MINUS_X, r0, BTN_W, BTN_H)) { lighting_.setDayNight(false); return true; }
+        if (inside(x, y, PLUS_X, r0, BTN_W, BTN_H))  { lighting_.setDayNight(true);  return true; }
+        if (inside(x, y, MINUS_X, r1, BTN_W, BTN_H)) { lighting_.setCaustics(false); return true; }
+        if (inside(x, y, PLUS_X, r1, BTN_W, BTN_H))  { lighting_.setCaustics(true);  return true; }
+        if (inside(x, y, MINUS_X, r2, BTN_W, BTN_H)) { props_.setEnabled(false); return true; }
+        if (inside(x, y, PLUS_X, r2, BTN_W, BTN_H))  { props_.setEnabled(true);  return true; }
+        if (inside(x, y, MINUS_X, r3, BTN_W, BTN_H)) { burnin_ = false; return true; }
+        if (inside(x, y, PLUS_X, r3, BTN_W, BTN_H))  { burnin_ = true;  return true; }
+        if (inside(x, y, MINUS_X, r4, BTN_W, BTN_H)) { autocycle_ = false; return true; }
+        if (inside(x, y, PLUS_X, r4, BTN_W, BTN_H))  { autocycle_ = true;  return true; }
     }
     return true;  // tap landed inside the open Settings panel: consume it
 }
