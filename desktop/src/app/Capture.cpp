@@ -111,12 +111,48 @@ bool Capture::saveScreenshot(const Framebuffer& fb) {
     return false;
 }
 
+bool Capture::ffmpegAvailable() const {
+    if (ffmpeg_ < 0) {
+#if defined(_WIN32)
+        ffmpeg_ = (std::system("ffmpeg -version >NUL 2>&1") == 0) ? 1 : 0;
+#else
+        ffmpeg_ = (std::system("ffmpeg -version >/dev/null 2>&1") == 0) ? 1 : 0;
+#endif
+    }
+    return ffmpeg_ == 1;
+}
+
+std::string Capture::encodeSequence() {
+    const std::string in = (fs::path(sequenceDir_) / "frame%06d.bmp").string();
+    const std::string mp4 = sequenceDir_ + ".mp4";  // sibling of the frames dir
+    std::string cmd = "ffmpeg -y -loglevel error -framerate 60 -start_number 0 -i \"" +
+                      in + "\" -pix_fmt yuv420p \"" + mp4 + "\"";
+    if (std::system(cmd.c_str()) != 0) {
+        std::fprintf(stderr, "[capture] ffmpeg mp4 encode failed\n");
+        return "Encode failed (ffmpeg)";
+    }
+    std::printf("[capture] encoded %s\n", mp4.c_str());
+    // A gif too, but only for short clips (they balloon fast).
+    if (sequenceFrame_ <= 900) {
+        const std::string gif = sequenceDir_ + ".gif";
+        std::string g = "ffmpeg -y -loglevel error -framerate 30 -start_number 0 -i \"" +
+                        in + "\" -vf \"fps=30,scale=320:-1:flags=neighbor\" \"" + gif + "\"";
+        std::system(g.c_str());  // best-effort
+    }
+    return "Encoded " + fs::path(mp4).filename().string();
+}
+
 void Capture::toggleSequence() {
     if (sequenceActive_) {
         sequenceActive_ = false;
-        lastStatus_ = "Sequence stopped (" + std::to_string(sequenceFrame_) + " frames)";
         std::printf("[capture] sequence stopped: %lu frames in %s\n",
                     sequenceFrame_, sequenceDir_.c_str());
+        if (sequenceFrame_ > 0 && ffmpegAvailable()) {
+            lastStatus_ = encodeSequence();
+        } else {
+            lastStatus_ = "Sequence: " + std::to_string(sequenceFrame_) + " frames" +
+                          (ffmpegAvailable() ? "" : " (install ffmpeg to encode)");
+        }
         return;
     }
     std::error_code ec;

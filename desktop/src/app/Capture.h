@@ -39,11 +39,17 @@ public:
     const std::string& directory() const { return dir_; }
 
 private:
+    // Best-effort encode of the just-finished sequence into mp4 (+ gif for
+    // short clips) via ffmpeg, if it's on PATH. Returns a status string.
+    std::string encodeSequence();
+    bool ffmpegAvailable() const;
+
     std::string dir_;
     bool sequenceActive_ = false;
     std::string sequenceDir_;
     unsigned long sequenceFrame_ = 0;
     std::string lastStatus_;
+    mutable int ffmpeg_ = -1;  // -1 unknown, 0 absent, 1 present
 };
 
 }  // namespace aq
