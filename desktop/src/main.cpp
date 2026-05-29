@@ -100,6 +100,15 @@ int main(int argc, char* argv[]) {
     Options opts;
     if (!parse_args(argc, argv, opts)) return 1;
 
+    // Become DPI-aware before SDL inits its video subsystem. Without this, a
+    // Windows display set above 100% scaling virtualizes the process: the OS
+    // reports window/render sizes in physical pixels but delivers mouse events
+    // in scaled (virtual) coordinates, so clicks land at 1/scale of where they
+    // should. Declaring per-monitor-v2 awareness makes the OS report everything
+    // in real pixels, so SDL_RenderWindowToLogical maps clicks correctly.
+    // (Harmless / ignored on non-Windows platforms.)
+    SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::fprintf(stderr, "SDL_Init(SDL_INIT_VIDEO) failed: %s\n", SDL_GetError());
         return 1;
@@ -205,14 +214,6 @@ int main(int argc, char* argv[]) {
         if (ui.handleTap(x, y)) return;
         aquarium.spawnFlake(static_cast<float>(x), static_cast<float>(y));
     };
-    // Convert a point in window pixels to the 320x240 logical canvas, honoring
-    // letterbox bars from integer scaling.
-    auto tap_from_window = [&](int wx, int wy) {
-        float lx = 0.0f, ly = 0.0f;
-        SDL_RenderWindowToLogical(renderer, wx, wy, &lx, &ly);
-        dispatch_tap(lx, ly);
-    };
-
     bool running = true;
     while (running) {
         SDL_Event ev;
@@ -254,17 +255,18 @@ int main(int argc, char* argv[]) {
                     break;
                 case SDL_MOUSEBUTTONDOWN:
                     if (ev.button.button == SDL_BUTTON_LEFT) {
-                        tap_from_window(ev.button.x, ev.button.y);
+                        // With a renderer logical size set, SDL already reports
+                        // mouse event coords in the logical (320x240) space, so
+                        // they're used directly — no further scaling.
+                        dispatch_tap(static_cast<float>(ev.button.x),
+                                     static_cast<float>(ev.button.y));
                     }
                     break;
-                case SDL_FINGERDOWN: {
-                    // Finger coords are normalized [0,1] over the window.
-                    int ww = 0, wh = 0;
-                    SDL_GetWindowSize(window, &ww, &wh);
-                    tap_from_window(static_cast<int>(ev.tfinger.x * ww),
-                                    static_cast<int>(ev.tfinger.y * wh));
+                case SDL_FINGERDOWN:
+                    // Touch coords are normalized [0,1]; scale to the canvas.
+                    dispatch_tap(ev.tfinger.x * kBackingWidth,
+                                 ev.tfinger.y * kBackingHeight);
                     break;
-                }
                 default:
                     break;
             }

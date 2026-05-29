@@ -15,7 +15,22 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(SDL2 REQUIRED)
+# SDL2: prefer a system install (e.g. Linux `apt install libsdl2-dev`); if none
+# is found (typical on Windows), download and build it automatically so the
+# project stays a one-command build everywhere.
+find_package(SDL2 QUIET)
+if(NOT SDL2_FOUND)
+    message(STATUS "System SDL2 not found — fetching and building SDL2 from source")
+    include(FetchContent)
+    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC ON  CACHE BOOL "" FORCE)
+    set(SDL_TEST   OFF CACHE BOOL "" FORCE)
+    set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
+    FetchContent_Declare(SDL2
+        URL https://github.com/libsdl-org/SDL/releases/download/release-2.32.4/SDL2-2.32.4.zip
+    )
+    FetchContent_MakeAvailable(SDL2)
+endif()
 
 set(AQ_SOURCES
     src/main.cpp
@@ -31,20 +46,39 @@ set(AQ_SOURCES
 
 add_executable(ascii-aquarium ${AQ_SOURCES})
 
+# On Windows, build a GUI (windowed) app so launching it doesn't pop a console
+# window — important for kiosk use. SDL2main provides the WinMain entry point.
+if(WIN32)
+    set_target_properties(ascii-aquarium PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()
+
 target_include_directories(ascii-aquarium PRIVATE src assets)
 
-if(TARGET SDL2::SDL2)
+# SDL2main first (provides the Windows entry-point shim), then the library —
+# preferring the static target from a fetched build for a standalone binary.
+if(TARGET SDL2::SDL2main)
+    target_link_libraries(ascii-aquarium PRIVATE SDL2::SDL2main)
+endif()
+if(TARGET SDL2::SDL2-static)
+    target_link_libraries(ascii-aquarium PRIVATE SDL2::SDL2-static)
+elseif(TARGET SDL2::SDL2)
     target_link_libraries(ascii-aquarium PRIVATE SDL2::SDL2)
-    if(TARGET SDL2::SDL2main)
-        target_link_libraries(ascii-aquarium PRIVATE SDL2::SDL2main)
-    endif()
 else()
     target_include_directories(ascii-aquarium PRIVATE ${SDL2_INCLUDE_DIRS})
     target_link_libraries(ascii-aquarium PRIVATE ${SDL2_LIBRARIES})
 endif()
 
+# If SDL2 ended up as a shared library, drop its DLL next to the executable.
+if(WIN32 AND TARGET SDL2::SDL2 AND NOT TARGET SDL2::SDL2-static)
+    add_custom_command(TARGET ascii-aquarium POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:SDL2::SDL2> $<TARGET_FILE_DIR:ascii-aquarium>)
+endif()
+
 if(MSVC)
     target_compile_options(ascii-aquarium PRIVATE /W4 /permissive-)
+    # Quiet MSVC's nags about standard strncpy/getenv (used safely here).
+    target_compile_definitions(ascii-aquarium PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
     target_compile_options(ascii-aquarium PRIVATE
         -Wall -Wextra -Wpedantic -Wshadow

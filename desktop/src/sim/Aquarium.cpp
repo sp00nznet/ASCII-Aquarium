@@ -923,7 +923,7 @@ void Aquarium::drawSeaweed(Framebuffer& fb) const {
         float bladeHeight = clampVal(32.0f * seaweedLength_ * heightVariation, 18.0f, 72.0f);
         int y0 = kScreenH - 2;
 
-        float prevX = bx, prevY = y0;
+        float prevX = bx, prevY = static_cast<float>(y0);
         const int segments = 7;
         for (int seg = 1; seg <= segments; ++seg) {
             float u = static_cast<float>(seg) / segments;
