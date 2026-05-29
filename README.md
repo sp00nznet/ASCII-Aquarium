@@ -24,29 +24,69 @@ This fork ports the aquarium to run as a native desktop application on
 **Linux and Windows on x86**, so the same tank can live on those tiny
 screens too.
 
+## Downloads
+
+Prebuilt **Linux / Windows / macOS** binaries — built by CI on every push to
+`main` — are at **<https://sp00.nz/releases/ASCII-Aquarium/>** (grab the `main/`
+folder, or a tagged release). Or build from source — see
+[`desktop/README.md`](desktop/README.md).
+
 ## What this fork adds
 
-- A `desktop/` directory containing a C++/SDL2 rewrite of the aquarium that
-  reproduces the on-device behavior and visuals on a normal PC.
-- A small `compat/` layer where it makes sense, so behavior (fish wandering,
-  schooling, separation, bubble physics, flake chase, octopus / seahorse
-  visitor cadence, seaweed sway, gradients, ASCII clock layout) stays faithful
-  to the device.
-- Desktop-appropriate replacements for the hardware bits:
-  - **Display**: SDL2 framebuffer at the original 320×240, with `--scale N`
-    integer scaling and `--fullscreen` for kiosk use on tiny screens.
-  - **Touch (XPT2046)** → SDL mouse / touch events, with optional cursor hide.
-  - **Persistent settings (ESP32 Preferences / NVS)** → JSON file at
-    `$XDG_CONFIG_HOME/ascii-aquarium/settings.json` on Linux and
-    `%APPDATA%\ascii-aquarium\settings.json` on Windows.
-  - **SD-card BMP capture** → writes to a local `captures/` directory
-    (`--capture-dir` to override). `BOOT` button → a keyboard hotkey.
-  - **Wi-Fi + NTP time sync** → uses the host's system clock. The Wi-Fi panel
-    is kept for UI parity but marked as system-managed.
-- Build files (CMake) that target Linux first and Windows second from the
-  same source tree.
-- Notes for autostarting as a kiosk (systemd user unit on Linux, Startup
-  folder / Task Scheduler on Windows).
+A native desktop build of the aquarium lives under [`desktop/`](desktop/) — a
+C++/SDL2 rewrite (no Arduino/ESP32) that runs on x86 **Linux, Windows, and
+macOS**. It reproduces the device's look and behavior, then layers on extras
+that suit an always-on desktop or kiosk display.
+
+**A faithful port of the device** — the upstream sketch is treated as the
+behavioral spec:
+
+- The full simulation: schooling fish (wander / alignment / cohesion /
+  separation) with depth tinting and the per-character swim wave, rising
+  bubbles, sinking food flakes, swaying multi-segment seaweed, and the visiting
+  octopus and seahorse — same math, same magic numbers.
+- A small RGB565 renderer reimplementing the slice of TFT_eSPI the sketch uses,
+  plus the vendored Font 1 / Font 2 bitmap glyphs, drawn into a 320×240 canvas.
+- The on-screen UI: HUD, tap-to-feed, the tabbed Settings panel and the clock
+  style/colour pop-overs.
+- All four backgrounds (black, dithered blue/purple gradient, pixel flowers)
+  and both clock styles (small text + big ASCII art).
+
+**Desktop replacements for the hardware bits:**
+
+- **Display** → SDL2 at the native 320×240 with `--scale N` integer scaling and
+  `--fullscreen`; DPI-aware so it stays crisp on scaled displays.
+- **Touch (XPT2046)** → SDL mouse **and** touchscreen events, debounced, with
+  optional cursor hide.
+- **Settings (ESP32 NVS)** → a `config.ini` in the platform config dir,
+  debounce-autosaved and restored on launch.
+- **SD-card BMP capture** → screenshots and frame sequences to a folder
+  (`--capture-dir`), with sequences auto-encoded to **mp4/gif** via ffmpeg when
+  it's available.
+- **Wi-Fi + NTP clock** → the host system clock. The device's Wi-Fi / NTP /
+  on-screen-keyboard flow is dropped — a desktop already knows the time.
+
+**New on desktop, beyond the device:**
+
+- **Day/night cycle** — ambient light/tint follows the OS clock — plus drifting
+  caustic light rays.
+- **More life** — a sand-scuttling crab, a drifting jellyfish, a rare shark
+  fly-through that scatters the school, and sand props (sandcastle, a bubbling
+  treasure chest, coral, rock).
+- **Fish hunger** — fish fill up when fed, mellow when sated, and graze the
+  weeds when starving.
+- **Kiosk care** — LCD burn-in protection (slow whole-frame drift) and an
+  optional background auto-cycle — all toggled and persisted in a **Scene**
+  settings tab.
+
+**Build & ship:**
+
+- One-command CMake build: Linux uses the system SDL2; Windows/macOS fetch and
+  static-link SDL2 into a standalone binary (no vcpkg, no loose DLLs).
+- A **GitLab CI/CD pipeline** (Linux / Windows / macOS shell runners) that
+  builds all three and drops the binaries on a release share.
+- Kiosk autostart docs (systemd user unit / `cage` on Linux; Startup folder /
+  Task Scheduler on Windows).
 
 ## What this fork does differently from upstream
 
@@ -63,8 +103,10 @@ screens too.
 
 ## Status
 
-Early port, in progress. See `desktop/README.md` for current build status
-and how to run.
+Feature-complete and cross-platform (Linux / Windows / macOS), built in CI.
+See [`desktop/README.md`](desktop/README.md) for build/run instructions, the
+full keyboard-shortcut list, and [`desktop/docs/KIOSK.md`](desktop/docs/KIOSK.md)
+for unattended/kiosk setup.
 
 ## Upstream sync
 
