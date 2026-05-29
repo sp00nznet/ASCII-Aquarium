@@ -58,6 +58,7 @@ struct Fish {
     std::uint16_t displayColor = 0;
     std::uint16_t renderColor = 0;
     float depthBrightness = 1.0f;
+    float fullness = 0.5f;   // 0 = starving (frantic), 1 = sated (calm)
 };
 
 struct Octopus {

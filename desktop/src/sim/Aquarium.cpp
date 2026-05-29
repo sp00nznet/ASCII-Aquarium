@@ -304,6 +304,7 @@ void Aquarium::activateFish(Fish& f, bool activeNow) {
     f.speed = rng_.frand(14.0f, 30.0f);
     f.phase = rng_.frand(0.0f, kTwoPi);
     f.wanderBias = rng_.frand(0.4f, 1.3f);
+    f.fullness = rng_.frand(0.3f, 0.7f);
 }
 
 void Aquarium::applyFishPopulation() {
@@ -708,15 +709,32 @@ void Aquarium::updateFish(float dt) {
             f.vy += (cy - f.y) * 0.0012f;
         }
 
-        // Feed-seeking behavior.
-        int fi = closestFlakeForFish(f, 140.0f);
+        // Hunger: fullness ebbs over time; hungrier fish search wider, pull
+        // harder toward food, and (when starving) sink to graze the seaweed.
+        f.fullness = clampVal(f.fullness - 0.018f * dt, 0.0f, 1.0f);
+        const float hunger = 1.0f - f.fullness;  // 0 sated .. 1 starving
+
+        // Feed-seeking behavior, scaled by hunger.
+        int fi = closestFlakeForFish(f, 90.0f + 70.0f * hunger);
         if (fi >= 0) {
             float dx = flakes_[fi].x - f.x;
             float dy = flakes_[fi].y - f.y;
             float d = std::sqrt(dx * dx + dy * dy) + 0.0001f;
-            f.vx += (dx / d) * 0.95f * dt;
-            f.vy += (dy / d) * 0.95f * dt;
-            if (d < 8.0f) flakes_[fi].active = false;  // "eat"
+            float seek = 0.4f + 0.9f * hunger;
+            f.vx += (dx / d) * seek * dt;
+            f.vy += (dy / d) * seek * dt;
+            if (d < 8.0f) {  // "eat"
+                flakes_[fi].active = false;
+                f.fullness = clampVal(f.fullness + 0.45f, 0.0f, 1.0f);
+            }
+        }
+
+        // When there are no flakes, a starving fish drifts down to nibble the
+        // seaweed and slowly recovers — so the school never stays frantic.
+        if (f.fullness < 0.3f) {
+            f.vy += 0.5f * dt;
+            if (f.y > kSeaLevelY - 36.0f)
+                f.fullness = clampVal(f.fullness + 0.05f * dt, 0.0f, 1.0f);
         }
 
         steerFishAwayFromOctopus(f, fCenterX, fCenterY, dt);
@@ -743,7 +761,9 @@ void Aquarium::updateFish(float dt) {
         f.vx /= mag;
         f.vy /= mag;
 
-        float fishSpeed = f.speed + std::sin(t * 3.2f + f.phase) * 4.0f;
+        // Sated fish cruise calmer; hungry fish swim at full pace.
+        float satedCalm = 0.7f + 0.3f * hunger;
+        float fishSpeed = (f.speed + std::sin(t * 3.2f + f.phase) * 4.0f) * satedCalm;
         f.x += f.vx * fishSpeed * dt;
         f.y += f.vy * fishSpeed * dt;
         keepFishOutsideOctopus(f);
