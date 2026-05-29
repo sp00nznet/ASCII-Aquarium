@@ -23,16 +23,27 @@ Early port, in progress. Currently:
   and swim-wave animation, rising bubbles, sinking food flakes, swaying
   seaweed, and the two occasional visitors (octopus, seahorse) — ported
   faithfully from the upstream sketch's update/draw math
-- ⬜ Background modes (black, blue/purple gradient, flowers)
-- ⬜ HUD + settings panels, on-screen keyboard
-- ⬜ Settings persistence, clock, BMP capture, kiosk autostart docs
+- ✅ Background modes: black, dithered blue/purple gradient, pixel flowers
+- ✅ On-screen clock: small text + big ASCII art, 12/24h, position, color,
+  horizontal flip — driven by the OS system clock
+- ✅ Input: debounced taps from mouse **and** touchscreen, mapped to the canvas
+- ✅ HUD + tabbed Settings panel (Tank / Seaweed / Clock / Backgrd) with the
+  Clock style + color pop-overs, all wired to the live simulation
+- ⬜ WiFi / internet-time flow (likely simplified — desktops have OS time)
+- ⬜ Settings persistence (config file), screenshot/sequence capture, kiosk
+  autostart docs
 
 Right now if you build and run, the window opens at 640×480 (2x scale)
-showing the live aquarium over a flat navy sea (real backgrounds land next):
-fish school and avoid each other, bubbles rise, seaweed sways, and
-**left-clicking drops a food flake** the fish swim toward and eat. The
-octopus and seahorse appear on a timer (~once an hour by default). Escape
-quits, F11 toggles fullscreen.
+showing the live aquarium: fish school and avoid each other over your chosen
+background, bubbles rise, seaweed sways, and **left-clicking (or tapping)
+drops a food flake** the fish swim toward and eat.
+
+Tap the top-left corner to reveal the HUD; the **S** button opens Settings
+(adjust fish/bubble counts, visitor frequency, seaweed, background, and the
+clock), and **R / H / O** respawn the school or summon a seahorse / octopus.
+Escape quits, F11 toggles fullscreen. Temporary keyboard shortcuts also exist:
+`B` cycles background, `C` toggles the clock, `V` its style, `H` 12/24h, `M`
+flip.
 
 ## Build
 
